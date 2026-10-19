@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  api 23 is the first release that can paint dark icons on a light status bar.
+-->
+<resources>
+    <style name="Theme.AttakyFlasher" parent="Base.Theme.AttakyFlasher">
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

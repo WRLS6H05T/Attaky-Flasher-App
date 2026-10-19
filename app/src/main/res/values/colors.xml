@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Attaky website palette, taken from the store's own CSS custom properties
+  (https://fwstore.attaky.com). The app mirrors that theme: an off-white page,
+  white cards with a hairline border, near-black ink, and the brand red kept for
+  the logo and the one primary action on a screen.
+-->
+<resources>
+    <!-- The page behind the cards. -->
+    <color name="attaky_bg">#FFFAFAFA</color>
+    <!-- White: the header and every card. -->
+    <color name="attaky_surface">#FFFFFFFF</color>
+    <!-- The splash is a chrome-free white screen, like the site header. -->
+    <color name="attaky_boot_bg">#FFFFFFFF</color>
+
+    <!-- Headings and body copy. -->
+    <color name="attaky_ink">#FF141414</color>
+    <color name="attaky_muted">#FF5C5C5C</color>
+    <!-- Hairline around cards and fields. -->
+    <color name="attaky_border">#FFE5E5E5</color>
+    <!-- Form errors. -->
+    <color name="attaky_danger">#FFE53E3E</color>
+
+    <!-- The wordmark red, also the primary button. -->
+    <color name="attaky_red">#FFC72B2F</color>
+    <!-- The same red a shade down, for the pressed state. -->
+    <color name="attaky_red_press">#FFA82327</color>
+    <!-- Neutral press wash for cards and outline controls. -->
+    <color name="attaky_press">#FFF2F2F2</color>
+
+    <!-- White, because the launcher mark is the red monogram on white. -->
+    <color name="attaky_launcher_background">#FFFFFFFF</color>
+</resources>

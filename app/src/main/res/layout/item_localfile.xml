@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One .bin the user picked from this device, with its flash offset. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/lfName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="middle"
+            android:fontFamily="@font/jetbrains_mono_regular"
+            android:maxLines="2"
+            android:textColor="@color/attaky_ink"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/lfMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:fontFamily="@font/switzer_regular"
+            android:textColor="@color/attaky_muted"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/lfOffset"
+        style="@style/AttakyInput"
+        android:layout_marginStart="8dp"
+        android:hint="0x0"
+        android:importantForAutofill="no"
+        android:inputType="text"
+        android:minWidth="96dp"
+        android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/lfRemove"
+        style="@style/AttakyButton"
+        android:layout_marginStart="6dp"
+        android:contentDescription="Remove"
+        android:text="✕" />
+</LinearLayout>

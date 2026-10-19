@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Shared type/controls for the native flasher screen, drawn in the same idiom as
+  the boot tiles: white cards on the site's off-white, a hairline border, the
+  brand red for the one primary action.
+-->
+<resources>
+
+    <style name="AttakyCard">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">12dp</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:background">@drawable/bg_attaky_tile</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">14dp</item>
+        <item name="android:paddingBottom">14dp</item>
+    </style>
+
+    <style name="AttakySectionLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:fontFamily">@font/jetbrains_mono_semibold</item>
+        <item name="android:letterSpacing">0.2</item>
+        <item name="android:textColor">@color/attaky_muted</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+
+    <style name="AttakyCardTitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:fontFamily">@font/switzer_semibold</item>
+        <item name="android:textColor">@color/attaky_ink</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <style name="AttakyBody">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:fontFamily">@font/switzer_regular</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+        <item name="android:textColor">@color/attaky_muted</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <style name="AttakyMono">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:fontFamily">@font/jetbrains_mono_regular</item>
+        <item name="android:textColor">@color/attaky_ink</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="AttakyButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/bg_attaky_button</item>
+        <item name="android:fontFamily">@font/switzer_semibold</item>
+        <item name="android:textColor">@color/attaky_ink</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.05</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">10dp</item>
+    </style>
+
+    <style name="AttakyPrimaryButton" parent="AttakyButton">
+        <item name="android:background">@drawable/bg_attaky_button_primary</item>
+        <item name="android:textColor">@color/attaky_surface</item>
+    </style>
+
+    <style name="AttakyInput">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/bg_attaky_button</item>
+        <item name="android:fontFamily">@font/jetbrains_mono_regular</item>
+        <item name="android:textColor">@color/attaky_ink</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
+    </style>
+
+</resources>

@@ -1,0 +1,5 @@
+First public release.
+
+* Browse the Attaky firmware store and flash online from your phone.
+* Fully native offline flasher for downloaded images and local .bin files.
+* ESP32-S3 flashing over USB with progress, console log and chip info.

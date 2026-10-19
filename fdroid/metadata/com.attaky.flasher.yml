@@ -1,0 +1,51 @@
+Categories:
+  - System
+License: Apache-2.0
+AuthorName: Attaky
+WebSite: https://attaky.com
+SourceCode: https://github.com/WRLS6H05T/Attaky-Flasher-App
+IssueTracker: https://github.com/WRLS6H05T/Attaky-Flasher-App/issues
+
+AutoName: Attaky Flasher
+
+RepoType: git
+Repo: https://github.com/WRLS6H05T/Attaky-Flasher-App.git
+
+Builds:
+  - versionName: 0.1.0-A001
+    versionCode: 1
+    commit: __RELEASE_COMMIT__
+    subdir: app
+    gradle:
+      - yes
+    scanignore:
+      - app/src/main/assets/www/firmware
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.1.0-A001
+CurrentVersionCode: 1
+
+MaintainerNotes: |-
+  This repository is a copy of the recipe that lives in fdroiddata
+  (metadata/com.attaky.flasher.yml). F-Droid does not read it from here —
+  copy it across (with commit: set to the full hash of the release commit)
+  when opening the merge request.
+
+  Notes for the reviewer:
+
+  * The build is a standard single-module Gradle project: subdir: app,
+    gradle: [yes] (assembleRelease), producing app-release-unsigned.apk.
+  * app/src/main/assets/www/firmware/*.bin are ESP32-S3 images bundled as
+    assets (developer builds not published to the store). They are data, not
+    code, and must not be deleted; hence the scanignore entry.
+  * app/src/main/assets/www/vendor/esptool-js.js is a vendored classic-script
+    build of esptool-js (Apache-2.0). Tools to re-vendor it live in tools/;
+    its licence is kept at vendor/esptool-js.LICENSE.txt.
+  * com.github.mik3y:usb-serial-for-android (MIT) is published on JitPack
+    only, so the build needs network access to jitpack.io. JitPack can
+    occasionally be slow, so a retry may be needed.
+  * The default home screen is the live proprietary store at
+    fwstore.attaky.com. The app also works fully offline from its native
+    flasher, but reviewers may still wish to apply the NonFreeNet
+    anti-feature.

@@ -1,0 +1,20 @@
+Attaky Flasher writes firmware to the Attaky Cyber Deck (ESP32-S3) over its USB-C port, straight from your phone. Plug the deck in and the phone acts as the USB host — no computer and no desktop toolchain required.
+
+Two ways to get firmware onto the deck:
+
+* Firmware store — browse the catalogue at fwstore.attaky.com inside the app and use the store's own "Flash Online" flow. The app backs the store's Web Serial calls with Android's USB Host API, so the download and the flash both happen on the phone.
+* Fully offline — open the native flasher to flash images the store already saved on this device, or pick your own .bin files with a per-file flash offset. Nothing is uploaded and no network is needed.
+
+The native flasher is written in Kotlin and speaks the ESP32-S3 ROM bootloader protocol directly, with a live progress bar, a console log, chip info, and advanced options (baud rate, verify, compress).
+
+Highlights:
+
+* Store-first: the live catalogue is the home screen, with a native escape button to the offline flasher.
+* Offline flashing of downloaded images or local .bin files.
+* Native ESP32-S3 flashing over USB (CH340, CP210x, FTDI, CDC-ACM).
+* Reads chip info and verifies every image before it is written.
+* No account, no analytics, no tracking.
+
+Compatibility: requires a phone with USB Host (USB-OTG) support and an Attaky deck or another ESP32-S3 board.
+
+Attaky Flasher is free and open-source software, licensed under the Apache License 2.0.

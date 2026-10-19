@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Primary button, as the store draws its own: solid brand red, softly rounded,
+  white label. Pressed is the same red a shade down.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/attaky_red_press" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/attaky_red" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+</selector>

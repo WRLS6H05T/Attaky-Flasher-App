@@ -1,0 +1,54 @@
+{
+  "name": "Attaky Firmware Catalogue",
+  "firmwares": [
+    {
+      "id": "attaky-launcher",
+      "name": "Attaky Launcher",
+      "version": "1.1.0",
+      "description": "Boot menu / controller for the Cyber Deck: partition manager, SD app installer, module check, WiFi and serial console.",
+      "chip": "ESP32-S3",
+      "baudrate": 460800,
+      "flashSize": "keep",
+      "size": 1646016,
+      "parts": [
+        {
+          "label": "Merged full image",
+          "offset": 0,
+          "url": "attaky-launcher-1.1.0-merged.bin",
+          "sha256": "fd0b874c65ce162864fabefaf40f37779e2ed542d0f480b9c1b31aea835ea92e"
+        }
+      ]
+    },
+    {
+      "id": "attaky-dj-scratch",
+      "name": "Attaky DJ Scratch",
+      "version": "0.1.0",
+      "description": "Single-deck DJ scratch & playback app: WAV/MP3 from SD, polar turntable, pitch rail, gamepad hot cues. Installs over the Launcher.",
+      "chip": "ESP32-S3",
+      "baudrate": 460800,
+      "flashSize": "keep",
+      "size": 543840,
+      "parts": [
+        {
+          "label": "Merged full image",
+          "offset": 0,
+          "url": "attaky-dj-scratch-0.1.0-merged.bin",
+          "sha256": "7cba8e991c8f97e28690f8c70cde23ae485e61c97213fd7d031b240fdb153b94"
+        }
+      ]
+    },
+    {
+      "id": "attaky-ghost-esp",
+      "name": "Attaky Ghost ESP",
+      "version": "",
+      "description": "Packet capture / demo firmware for the Cyber Deck. No image is published yet — flashing from here is disabled until this entry ships a download URL.",
+      "chip": "ESP32-S3",
+      "baudrate": 460800,
+      "flashSize": "keep",
+      "size": 0,
+      "unavailable": true,
+      "notes": "No upstream build has been released for the Ghost ESP image yet.",
+      "parts": []
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>Attaky Flasher</title>
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wordmark">
+      <img src="img/attaky-logo.png" alt="Attaky" />
+      <span class="sub">Flasher</span>
+    </div>
+  </header>
+
+  <!--
+    The bundled page is the offline home: it does no flashing itself. The store
+    is where firmware is browsed, downloaded, and web-flashed; the native flasher
+    drives the deck directly with no network at all.
+  -->
+  <main class="screen menu-screen">
+    <h1 class="menu-title">Where should the firmware come from?</h1>
+
+    <button id="btnStore" class="menu-card" type="button">
+      <span class="menu-card-title">Firmware store</span>
+      <span class="menu-card-sub">Browse and download the newest releases from fwstore.attaky.com, or flash online over USB. Needs a connection.</span>
+    </button>
+
+    <button id="btnNative" class="menu-card" type="button">
+      <span class="menu-card-title">Native flasher</span>
+      <span class="menu-card-sub">Flash images already downloaded to this phone, or local .bin files. Works fully offline.</span>
+    </button>
+
+    <p id="menuHint" class="hint">Tip: the native flasher works with no connection at all.</p>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The activity is the boot flow plus the flasher WebView: `webHost` holds the
+  WebView (created in code) and `bootHost` carries the native boot screens
+  (splash -> sign-in -> firmware source). Emptying `bootHost` reveals the page.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/attaky_bg">
+
+    <FrameLayout
+        android:id="@+id/webHost"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <FrameLayout
+        android:id="@+id/bootHost"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fitsSystemWindows="true" />
+</FrameLayout>

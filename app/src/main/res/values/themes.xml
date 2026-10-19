@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The whole UI lives in the WebView, so the native theme is just the window: a
+  white, chrome-free surface that matches the store's header instead of flashing
+  a colour on launch.
+-->
+<resources>
+    <style name="Base.Theme.AttakyFlasher" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/attaky_surface</item>
+        <item name="android:colorBackground">@color/attaky_surface</item>
+        <item name="android:statusBarColor">@color/attaky_surface</item>
+        <item name="android:navigationBarColor">@color/attaky_surface</item>
+        <!-- The accent only reaches the sign-out dialog's buttons. -->
+        <item name="colorAccent">@color/attaky_red</item>
+    </style>
+
+    <style name="Theme.AttakyFlasher" parent="Base.Theme.AttakyFlasher" />
+</resources>

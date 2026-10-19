@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Attaky Flasher</string>
+    <string name="usb_permission_title">Allow Attaky Flasher to access the deck?</string>
+
+    <!-- Brand lockup. The wordmark itself comes from the store's own artwork. -->
+    <string name="attaky_name" translatable="false">ATTAKY</string>
+    <string name="attaky_flasher_wordmark" translatable="false">F L A S H E R</string>
+    <string name="attaky_flasher" translatable="false">FLASHER</string>
+    <string name="splash_version">V%1$s</string>
+
+    <!-- Boot: firmware source chooser. -->
+    <string name="choice_title">Where should the firmware come from?</string>
+    <string name="choice_store_title">FIRMWARE STORE</string>
+    <string name="choice_store_sub">Browse and flash the newest releases from fwstore.attaky.com.</string>
+    <string name="choice_bundled_title">DOWNLOADED FIRMWARE</string>
+    <string name="choice_bundled_sub">Flash images already on this device. Works offline.</string>
+
+    <!-- Native flasher: empty downloaded list. -->
+    <string name="no_firmware_title">No downloaded firmware</string>
+    <string name="no_firmware_message">Download firmware from the store first, or flash .bin files from this device.</string>
+    <string name="no_firmware_choose">Choose .bin files</string>
+
+    <!-- Firmware downloads from the store, kept on the phone for offline flashing. -->
+    <string name="download_started">Saving %1$s for offline flashing…</string>
+    <string name="download_saved">Saved %1$s — open “Downloaded Firmware” to flash it offline.</string>
+    <string name="download_failed">Download failed: %1$s</string>
+</resources>

@@ -1,0 +1,29 @@
+# Gradle / Android Studio
+.gradle/
+.kotlin/
+build/
+local.properties
+captures/
+.idea/
+*.iml
+.fleet/
+
+# Packaged app artefacts
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Signing material — never commit these
+*.jks
+*.keystore
+keystore.properties
+
+# Temp / generated
+tools/esptool-js.bundle.esm.js
+app/src/main/assets/www/vendor/esptool-js.bundle.esm.js
+tmp/
+
+# OS cruft
+.DS_Store
+Thumbs.db

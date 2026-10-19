@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  api 27 adds the dark navigation-bar icons; both flags are needed from here on
+  because the newest matching style wins outright.
+-->
+<resources>
+    <style name="Theme.AttakyFlasher" parent="Base.Theme.AttakyFlasher">
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>
