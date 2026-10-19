@@ -14,7 +14,7 @@ Repo: https://github.com/WRLS6H05T/Attaky-Flasher-App.git
 Builds:
   - versionName: 0.1.0-A001
     versionCode: 1
-    commit: __RELEASE_COMMIT__
+    commit: 4a2185e4126e8b16723c919b55b673fd9f3e630c
     subdir: app
     gradle:
       - yes
@@ -28,7 +28,7 @@ CurrentVersionCode: 1
 
 MaintainerNotes: |-
   This repository is a copy of the recipe that lives in fdroiddata
-  (metadata/com.attaky.flasher.yml). F-Droid does not read it from here —
+  (metadata/com.attaky.flasher.yml). F-Droid does not read it from here â€”
   copy it across (with commit: set to the full hash of the release commit)
   when opening the merge request.
 
