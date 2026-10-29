@@ -18,11 +18,20 @@
 
     <!-- Native flasher: empty downloaded list. -->
     <string name="no_firmware_title">No downloaded firmware</string>
-    <string name="no_firmware_message">Download firmware from the store first, or flash .bin files from this device.</string>
-    <string name="no_firmware_choose">Choose .bin files</string>
+    <string name="no_firmware_message">Download firmware from the store first. A merged download lands in “Downloaded firmware” ready to flash.</string>
+    <string name="no_firmware_choose">Open the flasher</string>
+
+    <!-- Main page: serial console for whatever ESP board is plugged in. -->
+    <string name="serial_title">ESP serial</string>
+    <string name="serial_hint">Type a line…</string>
+    <string name="serial_open">OPEN PORT</string>
+    <string name="serial_close">CLOSE PORT</string>
+    <string name="serial_send">SEND</string>
+    <string name="serial_clear">CLEAR</string>
 
     <!-- Firmware downloads from the store, kept on the phone for offline flashing. -->
     <string name="download_started">Saving %1$s for offline flashing…</string>
     <string name="download_saved">Saved %1$s — open “Downloaded Firmware” to flash it offline.</string>
+    <string name="download_saved_merged">Saved %1$s to %2$s on this device — it is ready in “Downloaded Firmware”.</string>
     <string name="download_failed">Download failed: %1$s</string>
 </resources>

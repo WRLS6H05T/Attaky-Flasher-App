@@ -12,6 +12,7 @@ import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
+import com.hoho.android.usbserial.driver.SerialTimeoutException
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
@@ -39,6 +40,10 @@ class UsbSerialService(private val context: Context) {
         private const val READ_SIZE = 4096
         private const val READ_TIMEOUT_MS = 250
         private const val WRITE_TIMEOUT_MS = 20000
+
+        /** Espressif's own VID, and the ESP32-S3 USB serial/JTAG product id. */
+        private const val ESPRESSIF_VID = 0x303A
+        private const val USB_JTAG_PID = 0x1001
 
         // Web Serial parity strings -> UsbSerialPort.PARITY_*
         private fun parityValue(name: String?): Int = when (name?.lowercase()) {
@@ -75,6 +80,11 @@ class UsbSerialService(private val context: Context) {
      *  (permission results, detach) are delivered to it. */
     @Volatile
     var nativeListener: Listener? = null
+
+    /** The main page's serial console. Same deal: lifecycle events only, since
+     *  it reads the port itself through [readRaw]. */
+    @Volatile
+    var monitorListener: Listener? = null
 
     @Volatile
     private var port: UsbSerialPort? = null
@@ -124,6 +134,7 @@ class UsbSerialService(private val context: Context) {
             receiversRegistered = false
         }
         listener = null
+        monitorListener = null
     }
 
     private val receiver = object : BroadcastReceiver() {
@@ -133,10 +144,12 @@ class UsbSerialService(private val context: Context) {
                     val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
                     listener?.onPermissionResult(granted)
                     nativeListener?.onPermissionResult(granted)
+                    monitorListener?.onPermissionResult(granted)
                 }
                 UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
                     listener?.onUsbEvent("attached")
                     nativeListener?.onUsbEvent("attached")
+                    monitorListener?.onUsbEvent("attached")
                 }
                 UsbManager.ACTION_USB_DEVICE_DETACHED -> {
                     val detached = IntentCompat.getParcelableExtra(
@@ -144,6 +157,7 @@ class UsbSerialService(private val context: Context) {
                     )
                     listener?.onUsbEvent("detached")
                     nativeListener?.onUsbEvent("detached")
+                    monitorListener?.onUsbEvent("detached")
                     val open = currentDevice
                     if (open != null && detached != null && open.deviceName == detached.deviceName) {
                         // The kernel will fail the next read/write; the read loop
@@ -331,9 +345,15 @@ class UsbSerialService(private val context: Context) {
             // Flow control is optional for flashing.
         }
 
-        // esptool-js drives EN/IO0 through DTR/RTS; start from a known idle state.
-        runCatching { p.setDTR(false) }
-        runCatching { p.setRTS(false) }
+        // esptool-js drives EN/IO0 through DTR/RTS; start from a known idle
+        // state. Not for the S3's own USB-JTAG, though: it reads those edges as
+        // reset requests, so forcing them here restarted the deck every time the
+        // port was opened.
+        val nativeUsb = device.vendorId == ESPRESSIF_VID && device.productId == USB_JTAG_PID
+        if (!nativeUsb) {
+            runCatching { p.setDTR(false) }
+            runCatching { p.setRTS(false) }
+        }
 
         port = p
         connection = conn
@@ -371,6 +391,32 @@ class UsbSerialService(private val context: Context) {
 
     fun isOpen(): Boolean = port != null
 
+    /**
+     * True while the open device is still present on the USB bus.
+     *
+     * A reset on the ESP32-S3's own USB re-enumerates the device, so the open
+     * connection goes stale and reads stay silent forever. Checking the bus
+     * separates that from a deck that is attached but simply not answering.
+     */
+    fun isDeviceAttached(): Boolean {
+        val device = currentDevice ?: return false
+        return runCatching {
+            usbManager.deviceList.values.any { it.deviceName == device.deviceName }
+        }.getOrDefault(true)
+    }
+
+    /**
+     * True when the open device is the ESP32-S3's own USB serial/JTAG.
+     *
+     * That peripheral has no EN/IO0 auto-reset circuit on the wire: it watches
+     * the DTR/RTS pattern itself and resets the chip from it. Pulsing it the
+     * way a CH340 board is pulsed makes the deck restart on every edge.
+     */
+    fun isUsbJtagLoader(): Boolean {
+        val device = currentDevice ?: return false
+        return device.vendorId == ESPRESSIF_VID && device.productId == USB_JTAG_PID
+    }
+
     // ------------------------------------------------------------------ io
 
     @Synchronized
@@ -386,7 +432,24 @@ class UsbSerialService(private val context: Context) {
     @Synchronized
     fun readRaw(buffer: ByteArray, timeoutMs: Int): Int {
         val p = port ?: throw IOException("Serial port is not open")
-        return p.read(buffer, timeoutMs)
+        return readOrNothing(p, buffer, timeoutMs)
+    }
+
+    /**
+     * Read with "nothing arrived yet" expressed as 0 bytes per [SerialTimeoutException].
+     *
+     * usb-serial-for-android's `UsbSerialPort.read(dest, timeout)` does not return 0
+     * on a quiet line: it throws [SerialTimeoutException]. Swallowing only that one
+     * exception keeps silence meaning "no data yet" everywhere in this app —
+     * otherwise the WebView read loop called a disconnect on the first idle tick
+     * (esptool-js then reports "No serial data received."), and the native flasher
+     * aborted an erase the deck was simply still working on. A real fault (device
+     * gone, I/O error) is still a different exception and still propagates.
+     */
+    private fun readOrNothing(p: UsbSerialPort, dest: ByteArray, timeoutMs: Int): Int = try {
+        p.read(dest, timeoutMs)
+    } catch (e: SerialTimeoutException) {
+        0
     }
 
     /** In-place baud change so esptool-js can skip a full close/reopen. */
@@ -429,7 +492,7 @@ class UsbSerialService(private val context: Context) {
             val buffer = ByteArray(READ_SIZE)
             while (reading.get()) {
                 try {
-                    val n = p.read(buffer, READ_TIMEOUT_MS)
+                    val n = readOrNothing(p, buffer, READ_TIMEOUT_MS)
                     if (n > 0) {
                         // The listener base64-encodes synchronously, so reuse is safe.
                         listener?.onData(buffer, n)

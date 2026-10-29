@@ -2,8 +2,9 @@
 <!--
   The native offline flasher. Reached from the boot chooser's "Downloaded
   Firmware" tile and from the store's floating escape button. Everything here is
-  local: the deck is driven over USB, firmware comes from the phone's own storage
-  (or files the user picks), and nothing needs the network except the Store link.
+  local: the deck is driven over USB and firmware comes from the images the
+  store already saved on this device. Nothing here needs the network except the
+  Store link.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/flasherRoot"
@@ -170,38 +171,6 @@
                     style="@style/AttakyBody"
                     android:layout_marginTop="10dp"
                     android:text="No downloaded firmware."
-                    android:visibility="gone" />
-            </LinearLayout>
-
-            <!-- Local .bin files -->
-            <LinearLayout style="@style/AttakyCard">
-
-                <TextView
-                    style="@style/AttakySectionLabel"
-                    android:text="Local .bin files" />
-
-                <TextView
-                    style="@style/AttakyBody"
-                    android:layout_marginTop="6dp"
-                    android:text="Pick .bin files from this device and set the flash offset for each." />
-
-                <Button
-                    android:id="@+id/btnPickFiles"
-                    style="@style/AttakyButton"
-                    android:layout_marginTop="10dp"
-                    android:text="CHOOSE FILES" />
-
-                <LinearLayout
-                    android:id="@+id/localFiles"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-
-                <Button
-                    android:id="@+id/btnFlashLocal"
-                    style="@style/AttakyPrimaryButton"
-                    android:layout_marginTop="10dp"
-                    android:text="FLASH LOCAL FILES"
                     android:visibility="gone" />
             </LinearLayout>
 

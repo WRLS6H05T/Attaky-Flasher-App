@@ -7,9 +7,10 @@ front ends:
   (`https://fwstore.attaky.com/en/`) in a WebView and injects a Web Serial
   polyfill, so the store's own **Flash Online** flow — esptool-js over
   `navigator.serial` — downloads and flashes the firmware on the phone.
-- **Native flasher (offline):** a fully native Kotlin screen that speaks the
-  ESP32-S3 ROM bootloader protocol directly, so images already on the device —
-  or local `.bin` files — can be flashed with no network at all.
+- **Native flasher (offline):** a native Kotlin screen that drives the deck
+  with the same esptool-js build the store uses, loaded off-screen in a 1 px
+  WebView, so images already saved on the device can be flashed with no network
+  at all.
 
 ```
 app/src/main/assets/www/
@@ -17,6 +18,9 @@ app/src/main/assets/www/
   css/app.css                Attaky terminal-instrument-panel theme
   js/webserial.js            navigator.serial polyfill -> Android USB bridge
   js/app.js                  catalogue, connect + flash flow
+  native-flasher.html        never shown; hosts the native flasher's esptool-js
+  js/native-flash.js         connect / flash / reset glue for that engine
+  js/store-merge.js          store pages -> download-merged hook
   vendor/esptool-js.js       esptool-js (classic script, window.esptool)
   firmware/manifest.json     bundled firmware catalogue
   firmware/*.bin             bundled merged images (developer builds)
@@ -49,17 +53,23 @@ tooling — no baud-rate config, no Windows drivers; the app is plain USB Host.
    download + flash.
 3. On any store page the header also carries an **⚡ Native Flasher** button
    that opens the offline flasher directly.
-4. **Downloaded Firmware** — the fully native screen:
+4. **Downloaded Firmware** — the native screen:
    - **DECK → CONNECT** the deck (allow USB access the first time) to read chip info.
-   - **DOWNLOADED FIRMWARE** lists images the store has already saved on this
-     device; each row has **Flash** and **Delete**. With none saved, a
-     *No downloaded firmware* dialog appears and **OK** returns to the chooser.
-   - **LOCAL .BIN FILES → CHOOSE FILES** picks `.bin` files from this device and
-     lets you set a flash offset per file.
+   - **DOWNLOADED FIRMWARE** lists images the store has saved on this device.
+     A store download fetches every part and merges them by flash address into
+     one image, so a firmware with separate bootloader / partition / app bins
+     flashes in a single pass. Each row has **Flash** and **Delete**; with none
+     saved a *No downloaded firmware* dialog appears and **OK** returns to the
+     chooser.
    - **ADVANCED** exposes baud rate, verify and compress.
-   - Progress, chip info and a console log are shown on the same screen; when a
-     flash finishes it returns to the list with a confirmation.
+   - Progress, chip info and a console log are shown on the same screen. A
+     finished flash hard-resets the deck so it reboots into the new firmware,
+     then closes the port.
    - The header button reads **FIRMWARE STORE** and takes you back to the store.
+5. **ESP serial** appears on the chooser when a USB serial device is attached:
+   a scrolling console, a send box, and open/close port, for watching a running
+   deck. The port is never taken on its own — a port open toggles DTR/RTS and
+   would reset the board.
 
 There is no sign-in and no settings screen.
 
@@ -118,8 +128,11 @@ The license is kept at `app/src/main/assets/www/vendor/esptool-js.LICENSE.txt`.
 | Path | Purpose |
 |---|---|
 | `app/src/main/java/com/attaky/flasher/MainActivity.kt` | Boot chooser, WebView, store-first routing, polyfill injection, native-flasher host, store header injection |
-| `app/src/main/java/com/attaky/flasher/NativeFlasher.kt` | The fully native offline flasher screen |
-| `app/src/main/java/com/attaky/flasher/EspFlasher.kt` | ESP32-S3 ROM bootloader protocol in Kotlin |
+| `app/src/main/java/com/attaky/flasher/NativeFlasher.kt` | The native offline flasher screen (UI, bin naming, merge, console) |
+| `app/src/main/java/com/attaky/flasher/JsFlasher.kt` | Off-screen WebView host that runs esptool-js for the native flasher |
+| `app/src/main/java/com/attaky/flasher/FlashLayout.kt` | Bin name → flash offset resolution and image merging |
+| `app/src/main/java/com/attaky/flasher/SerialMonitor.kt` | ESP serial console on the chooser screen |
+| `app/src/main/java/com/attaky/flasher/EspFlasher.kt` | Earlier hand-rolled ROM protocol, no longer used (superseded by `JsFlasher`) |
 | `app/src/main/java/com/attaky/flasher/UsbSerialService.kt` | USB enumeration, permission, open/write/signals, read loop |
 | `app/src/main/java/com/attaky/flasher/SerialBridge.kt` | `window.AttakyUSB` JS↔Java contract |
 | `app/src/main/java/com/attaky/flasher/FirmwareDownloads.kt` | App-local store of downloaded firmware images |

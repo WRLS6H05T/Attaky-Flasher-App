@@ -1,7 +1,6 @@
 package com.attaky.flasher
 
 import android.content.SharedPreferences
-import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,10 +11,8 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.core.widget.doAfterTextChanged
 import org.json.JSONArray
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The native offline flasher screen.
@@ -25,9 +22,13 @@ import java.util.concurrent.atomic.AtomicBoolean
  * over USB, firmware comes from the phone's own storage (or files the user
  * picks), and nothing needs the network except the Store link.
  *
- * The port is opened in raw mode ([UsbSerialService.openRaw]), so the WebView's
- * background read loop is off and [EspFlasher] owns the byte stream. All USB
- * work runs on a private worker; the UI is only touched back on the main thread.
+ * The deck is flashed by the store's own flasher: [JsFlasher] loads the vendored
+ * esptool-js off-screen and drives the port through the same bridge the store
+ * pages use, so both flash the chip identically. This screen only builds the
+ * image, shows the log and the bar, and touches the UI back on the main thread.
+ *
+ * One image per row: the store writes whole merged images now, so a row is
+ * already everything the deck needs and there is no local bin set to assemble.
  */
 class NativeFlasher(
     private val activity: android.app.Activity,
@@ -35,7 +36,6 @@ class NativeFlasher(
     private val downloads: FirmwareDownloads,
     private val prefs: SharedPreferences,
     private val root: View,
-    private val pickFiles: (Array<String>, (List<Uri>) -> Unit) -> Unit,
     private val onExit: () -> Unit,
     private val onOpenStore: () -> Unit,
 ) : UsbSerialService.Listener {
@@ -44,19 +44,14 @@ class NativeFlasher(
         Thread(runnable, "attaky-native-flash").apply { isDaemon = true }
     }
 
-    private val cancelRequested = AtomicBoolean(false)
-
     private val btnBack: View = root.findViewById(R.id.btnBack)
     private val btnStore: View = root.findViewById(R.id.btnStore)
     private val btnConnect: Button = root.findViewById(R.id.btnConnect)
     private val btnRescan: Button = root.findViewById(R.id.btnRescan)
-    private val btnPickFiles: Button = root.findViewById(R.id.btnPickFiles)
-    private val btnFlashLocal: Button = root.findViewById(R.id.btnFlashLocal)
     private val connPill: TextView = root.findViewById(R.id.connPill)
     private val chipInfo: TextView = root.findViewById(R.id.chipInfo)
     private val firmwareList: ViewGroup = root.findViewById(R.id.firmwareList)
     private val firmwareEmpty: View = root.findViewById(R.id.firmwareEmpty)
-    private val localFilesList: ViewGroup = root.findViewById(R.id.localFiles)
     private val consoleView: TextView = root.findViewById(R.id.console)
     private val progressBox: View = root.findViewById(R.id.progressBox)
     private val progressBar: ProgressBar = root.findViewById(R.id.progressBar)
@@ -68,8 +63,6 @@ class NativeFlasher(
     private val checkVerify: CheckBox = root.findViewById(R.id.checkVerify)
     private val checkCompress: CheckBox = root.findViewById(R.id.checkCompress)
 
-    private val localFiles = ArrayList<LocalFile>()
-
     private val console = StringBuilder()
 
     @Volatile
@@ -78,11 +71,11 @@ class NativeFlasher(
     @Volatile
     private var busy = false
 
-    private var pendingConnectIndex = -1
+    /** The store's flasher, running off-screen (see [JsFlasher]). */
+    private var engine: JsFlasher? = null
 
-    private class LocalFile(val uri: Uri, val name: String, val size: Long) {
-        var offset: String = "0x0"
-    }
+    /** Whose bytes the USB read loop delivered before the engine took over. */
+    private var previousListener: UsbSerialService.Listener? = null
 
     private class Write(val offset: Long, val label: String, val read: () -> ByteArray)
 
@@ -93,13 +86,28 @@ class NativeFlasher(
     fun start() {
         service.nativeListener = this
 
+        // The store's esptool-js does the talking. It lives in a 1 px WebView on
+        // this screen and receives the deck's bytes through the same serial
+        // bridge the store pages use, so the read loop must point at it.
+        previousListener = service.listener
+        engine = (root as? ViewGroup)?.let { container ->
+            JsFlasher(
+                activity = activity,
+                service = service,
+                container = container,
+                onLog = { line -> log(line) },
+                onProgress = { percent -> onProgress(percent) },
+                onConnected = { chip, mac -> onEngineConnected(chip, mac) },
+                onConnectFailed = { message -> onEngineConnectFailed(message) },
+                onFlashDone = { ok, message -> onEngineFlashDone(ok, message) },
+            ).also { service.listener = it.bridge }
+        }
+
         btnBack.setOnClickListener { onExit() }
         btnStore.setOnClickListener { onOpenStore() }
         advancedToggle.setOnClickListener { toggleAdvanced() }
         btnConnect.setOnClickListener { onConnectClicked() }
         btnRescan.setOnClickListener { refreshDeckStatus(logLine = true) }
-        btnPickFiles.setOnClickListener { chooseFiles() }
-        btnFlashLocal.setOnClickListener { flashLocalFiles() }
 
         baudInput.setText(prefs.getInt(KEY_BAUD, DEFAULT_BAUD).toString())
         checkVerify.isChecked = prefs.getBoolean(KEY_VERIFY, true)
@@ -109,15 +117,13 @@ class NativeFlasher(
             activity.getString(R.string.splash_version, BuildConfig.VERSION_NAME)
 
         renderFirmware()
-        renderLocalFiles()
         updateConnectedUi()
-        log("Ready. Flash a downloaded image, or connect the deck.")
+        log("Ready. Pick a downloaded image, or connect the deck.")
         refreshDeckStatus(logLine = false)
     }
 
     /** Persist the advanced options and release the port. */
     fun stop() {
-        cancelRequested.set(true)
         runCatching {
             prefs.edit()
                 .putInt(KEY_BAUD, baudFromPrefs())
@@ -126,6 +132,11 @@ class NativeFlasher(
                 .apply()
         }
         service.nativeListener = null
+        engine?.disconnect()
+        engine?.release()
+        engine = null
+        service.listener = previousListener
+        previousListener = null
         runCatching { service.close() }
         io.shutdownNow()
         connected = false
@@ -182,53 +193,46 @@ class NativeFlasher(
             return
         }
         val port = ports.firstOrNull { it.granted } ?: ports.first()
-        openPort(port.index)
+        connectWithEngine(port.index)
     }
 
-    private fun openPort(index: Int) {
-        val outcome = service.openRaw(index, baudFromPrefs())
-        when (outcome.status) {
-            "ok" -> beginSync()
-            "permission" -> {
-                pendingConnectIndex = index
-                log("Waiting for USB permission…")
-            }
-            else -> {
-                log("Could not open the deck: ${outcome.message}")
-                toast(outcome.message ?: "Could not open the deck.")
-            }
+    /**
+     * Hand the deck to esptool-js: it opens the port (asking for USB permission
+     * if needed), resets and syncs the chip, reads its description and MAC, and
+     * loads the flasher stub — the same handshake a store page performs.
+     */
+    private fun connectWithEngine(index: Int) {
+        val engine = engine
+        if (engine == null) {
+            log("The flash engine is not loaded; reopen this screen.")
+            toast("The flash engine is not loaded.")
+            return
         }
-    }
-
-    private fun beginSync() {
-        val baud = baudFromPrefs()
         setBusy(true)
-        log("Connecting to the chip…")
-        runIo {
-            try {
-                val flasher = EspFlasher(service)
-                val info = flasher.connect(baud) { line -> log(line) }
-                activity.runOnUiThread {
-                    connected = true
-                    setBusy(false)
-                    updateConnectedUi()
-                    chipInfo.visibility = View.VISIBLE
-                    chipInfo.text = "${info.name}\nMAC ${info.mac}"
-                }
-            } catch (t: Throwable) {
-                activity.runOnUiThread {
-                    setBusy(false)
-                    connected = false
-                    updateConnectedUi()
-                    log("Could not connect: ${t.message}")
-                    toast("Could not connect to the deck.")
-                    runCatching { service.close() }
-                }
-            }
-        }
+        log("Connecting with the store's flasher engine…")
+        engine.connect(index, baudFromPrefs())
+    }
+
+    private fun onEngineConnected(chip: String, mac: String) {
+        connected = true
+        setBusy(false)
+        updateConnectedUi()
+        chipInfo.visibility = View.VISIBLE
+        chipInfo.text = if (mac.isNotEmpty()) "$chip\nMAC $mac" else chip
+    }
+
+    private fun onEngineConnectFailed(message: String) {
+        connected = false
+        setBusy(false)
+        updateConnectedUi()
+        chipInfo.visibility = View.GONE
+        log("Could not connect: $message")
+        toast("Could not connect to the deck.")
+        runCatching { service.close() }
     }
 
     private fun disconnect() {
+        engine?.disconnect()
         runCatching { service.close() }
         connected = false
         updateConnectedUi()
@@ -238,12 +242,7 @@ class NativeFlasher(
 
     override fun onPermissionResult(granted: Boolean) {
         activity.runOnUiThread {
-            if (granted) {
-                val index = pendingConnectIndex
-                pendingConnectIndex = -1
-                if (index >= 0) openPort(index)
-            } else {
-                pendingConnectIndex = -1
+            if (!granted) {
                 log("USB permission denied.")
                 toast("USB permission denied.")
             }
@@ -292,8 +291,11 @@ class NativeFlasher(
         for (entry in entries) {
             val row = inflater.inflate(R.layout.item_firmware, firmwareList, false)
             row.findViewById<TextView>(R.id.fwName).text = entry.name
-            row.findViewById<TextView>(R.id.fwMeta).text =
-                "${humanSize(entry.size)} · 0x${entry.offset.toString(16)}"
+            row.findViewById<TextView>(R.id.fwMeta).text = buildString {
+                append(humanSize(entry.size))
+                append(" · 0x").append(offsetOf(entry).toString(16))
+                FlashLayout.slotFor(entry.name)?.let { append(" · ").append(it.role) }
+            }
             row.findViewById<View>(R.id.fwFlash).setOnClickListener { confirmFlashDownloaded(entry) }
             row.findViewById<View>(R.id.fwDelete).setOnClickListener { confirmDelete(entry.name) }
             firmwareList.addView(row)
@@ -308,11 +310,15 @@ class NativeFlasher(
         }
         AlertDialog.Builder(activity)
             .setTitle(entry.name)
-            .setMessage("Write ${humanSize(entry.size)} to the deck at 0x${entry.offset.toString(16)}?")
+            .setMessage("Write ${humanSize(entry.size)} to the deck at 0x${offsetOf(entry).toString(16)}?")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Flash") { _, _ -> flashDownloaded(entry) }
             .show()
     }
+
+    /** What the index recorded, else what the file name says. */
+    private fun offsetOf(entry: FirmwareDownloads.Entry): Long =
+        if (entry.offset > 0L) entry.offset else (FlashLayout.slotFor(entry.name)?.offset ?: 0L)
 
     private fun flashDownloaded(entry: FirmwareDownloads.Entry) {
         val file = downloads.fileFor(entry.name)
@@ -321,7 +327,7 @@ class NativeFlasher(
             renderFirmware()
             return
         }
-        startFlash(listOf(Write(entry.offset, entry.name) { file.readBytes() }))
+        startFlash(listOf(Write(offsetOf(entry), entry.name) { file.readBytes() }))
     }
 
     private fun confirmDelete(name: String) {
@@ -337,135 +343,84 @@ class NativeFlasher(
             .show()
     }
 
-    // --------------------------------------------------------------- local files
-
-    private fun chooseFiles() {
-        if (busy) return
-        pickFiles(arrayOf("*/*")) { uris ->
-            var added = 0
-            for (uri in uris) {
-                addLocalFile(uri)
-                added++
-            }
-            if (added > 0) {
-                renderLocalFiles()
-                log("Added $added file(s).")
-            }
-        }
-    }
-
-    private fun addLocalFile(uri: Uri) {
-        var name = uri.lastPathSegment ?: "firmware.bin"
-        var size = -1L
-        try {
-            activity.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex >= 0) name = cursor.getString(nameIndex) ?: name
-                    val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
-                    if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) size = cursor.getLong(sizeIndex)
-                }
-            }
-        } catch (t: Throwable) {
-            log("Could not read $name: ${t.message}")
-        }
-        localFiles.add(LocalFile(uri, name, size))
-    }
-
-    private fun renderLocalFiles() {
-        localFilesList.removeAllViews()
-        val inflater = LayoutInflater.from(activity)
-        for (file in localFiles) {
-            val row = inflater.inflate(R.layout.item_localfile, localFilesList, false)
-            row.findViewById<TextView>(R.id.lfName).text = file.name
-            row.findViewById<TextView>(R.id.lfMeta).text =
-                if (file.size >= 0) humanSize(file.size) else "size unknown"
-            val offsetField = row.findViewById<EditText>(R.id.lfOffset)
-            offsetField.setText(file.offset)
-            offsetField.doAfterTextChanged { file.offset = it?.toString().orEmpty() }
-            row.findViewById<View>(R.id.lfRemove).setOnClickListener {
-                localFiles.remove(file)
-                renderLocalFiles()
-            }
-            localFilesList.addView(row)
-        }
-        btnFlashLocal.visibility = if (localFiles.isEmpty()) View.GONE else View.VISIBLE
-    }
-
-    private fun flashLocalFiles() {
-        if (busy) return
-        if (!connected) {
-            toast("Connect the deck first.")
-            return
-        }
-        if (localFiles.isEmpty()) return
-
-        val writes = ArrayList<Write>()
-        for (file in localFiles) {
-            val offset = parseOffset(file.offset) ?: run {
-                toast("Bad offset for ${file.name}.")
-                log("Offset for ${file.name} is not a number: \"${file.offset}\"")
-                return
-            }
-            writes.add(Write(offset, file.name) {
-                activity.contentResolver.openInputStream(file.uri)?.use { it.readBytes() }
-                    ?: throw java.io.IOException("Could not open ${file.name}")
-            })
-        }
-        startFlash(writes)
-    }
-
     // ------------------------------------------------------------------ flashing
 
     private fun startFlash(writes: List<Write>) {
         val compress = checkCompress.isChecked
         val verify = checkVerify.isChecked
-        val baud = baudFromPrefs()
 
         setBusy(true)
         progressBox.visibility = View.VISIBLE
         progressBar.progress = 0
         progressText.text = "Preparing…"
-        log("Flashing ${writes.size} image(s)…")
+        log(if (writes.size == 1) "Flashing ${writes.first().label}…" else "Putting ${writes.size} bins together…")
 
         runIo {
-            try {
-                val flasher = EspFlasher(service)
-                flasher.connect(baud) { line -> log(line) }
-                if (baud != DEFAULT_BAUD) flasher.changeBaud(baud) { line -> log(line) }
-                writes.forEachIndexed { index, write ->
-                    if (cancelRequested.get()) throw EspFlasher.CancelledException()
-                    val bytes = write.read()
-                    log("Writing ${write.label} (${humanSize(bytes.size.toLong())}) at 0x${write.offset.toString(16)}…")
-                    flasher.writeFirmware(
-                        offset = write.offset,
-                        image = bytes,
-                        compress = compress,
-                        verify = verify,
-                        log = { line -> log(line) },
-                        progress = { percent -> onProgress(index, writes.size, percent) },
-                        isCancelled = { cancelRequested.get() },
-                    )
-                }
-                flasher.hardReset()
-                activity.runOnUiThread {
-                    setBusy(false)
-                    progressBox.visibility = View.GONE
-                    log("Done. The deck is rebooting.")
-                    showFlashDone()
-                }
+            // Read and place everything before touching the deck: a bad set (a
+            // missing file, two bins on the same offset) must not reset the chip.
+            val image = try {
+                FlashLayout.join(
+                    writes.map { write -> FlashLayout.Part(write.label, write.offset, write.read()) },
+                )
             } catch (t: Throwable) {
                 activity.runOnUiThread {
                     setBusy(false)
                     progressBox.visibility = View.GONE
-                    if (t is EspFlasher.CancelledException) {
-                        log("Flash stopped.")
-                    } else {
-                        log("Flash failed: ${t.message}")
-                        toast("Flash failed: ${t.message}")
-                    }
+                    log("Could not build the image: ${t.message}")
+                    toast(t.message ?: "Could not build the image.")
                 }
+                return@runIo
             }
+
+            image.parts.forEach { part ->
+                log("  ${part.label} → 0x${part.offset.toString(16)} (${humanSize(part.bytes.size.toLong())})")
+            }
+            log(
+                "One image: ${humanSize(image.bytes.size.toLong())} at " +
+                    "0x${image.offset.toString(16)}.",
+            )
+
+            // From here the store's engine owns the deck: it writes the image
+            // through the flasher stub and resets the chip when done.
+            val engine = engine
+            if (engine == null) {
+                activity.runOnUiThread {
+                    setBusy(false)
+                    progressBox.visibility = View.GONE
+                    log("The flash engine is not loaded; reopen this screen.")
+                }
+                return@runIo
+            }
+            engine.flash(
+                offset = image.offset,
+                bytes = image.bytes,
+                compress = compress,
+                verify = verify,
+            )
+        }
+    }
+
+    private fun onEngineFlashDone(ok: Boolean, message: String) {
+        activity.runOnUiThread {
+            setBusy(false)
+            if (ok) {
+                progressBar.progress = 100
+                progressText.text = "Written — 100%"
+            }
+            progressBox.visibility = View.GONE
+            if (ok) {
+                log("Done. The deck is rebooting.")
+                showFlashDone()
+            } else {
+                log("Flash failed: $message")
+                toast("Flash failed: $message")
+            }
+            // The engine hard-resets the chip and closes the port, so the
+            // session is over either way.
+            connected = false
+            updateConnectedUi()
+            chipInfo.visibility = View.GONE
+            runCatching { service.close() }
         }
     }
 
@@ -477,14 +432,10 @@ class NativeFlasher(
             .show()
     }
 
-    private fun onProgress(index: Int, total: Int, percent: Int) {
+    private fun onProgress(percent: Int) {
         activity.runOnUiThread {
             progressBar.progress = percent
-            progressText.text = if (total > 1) {
-                "Writing ${index + 1} of $total — $percent%"
-            } else {
-                "Writing — $percent%"
-            }
+            progressText.text = "Writing — $percent%"
         }
     }
 
@@ -494,8 +445,6 @@ class NativeFlasher(
         busy = value
         btnConnect.isEnabled = !value
         btnRescan.isEnabled = !value
-        btnPickFiles.isEnabled = !value
-        btnFlashLocal.isEnabled = !value
     }
 
     private fun toggleAdvanced() {
@@ -546,20 +495,6 @@ class NativeFlasher(
         bytes < 1024 -> "$bytes B"
         bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
         else -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
-    }
-
-    private fun parseOffset(text: String?): Long? {
-        val trimmed = text?.trim().orEmpty()
-        if (trimmed.isEmpty()) return 0L
-        return try {
-            if (trimmed.startsWith("0x") || trimmed.startsWith("0X")) {
-                trimmed.substring(2).toLong(16)
-            } else {
-                trimmed.toLong()
-            }
-        } catch (t: Throwable) {
-            null
-        }
     }
 
     private companion object {

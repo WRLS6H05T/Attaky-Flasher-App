@@ -54,6 +54,11 @@ class EspFlasher(private val usb: UsbSerialService) {
         /** ROM write block for the ESP32-S3 (matches esptool's ROM value). */
         const val FLASH_WRITE_SIZE = 0x400
 
+        /** Bytes erased and written per FlashBegin cycle (16 flash sectors). */
+        const val WRITE_CHUNK_SIZE = 0x10000
+
+        const val ESP_FLASH_END = 0x04
+
         const val CHIP_DETECT_MAGIC_REG = 0x40001000L
         const val ESP32S3_MAGIC = 0x00000009L
         const val ESP32S3_CHIP_NAME = "ESP32-S3"
@@ -61,7 +66,16 @@ class EspFlasher(private val usb: UsbSerialService) {
         /** EFUSE_BASE + 0x44, the first MAC word on the ESP32-S3. */
         const val MAC_EFUSE_REG = 0x60007044L
 
+        /**
+         * Erase budget. With 64 KB chunks this only has to cover an erase of 16
+         * sectors, so 30 s/MB (esptool's ROM figure) and a 15 s floor is plenty
+         * and fails fast when the deck really has stopped answering.
+         */
         const val ERASE_TIMEOUT_PER_MB = 30000L
+
+        /** Reset styles to try, most likely first (see [connect]). */
+        private val UART_FIRST = listOf(ResetStyle.CLASSIC, ResetStyle.INVERTED, ResetStyle.USB_JTAG)
+        private val USB_FIRST = listOf(ResetStyle.USB_JTAG, ResetStyle.CLASSIC, ResetStyle.INVERTED)
         const val WRITE_TIMEOUT_PER_MB = 40000L
         const val MD5_TIMEOUT_PER_MB = 8000L
     }
@@ -69,35 +83,88 @@ class EspFlasher(private val usb: UsbSerialService) {
     /** Leftover bytes read from the port but not yet consumed. */
     private var buffer = ByteArray(0)
 
+    /** The reset style that got the deck talking; reused for the final reset. */
+    @Volatile
+    private var workingStyle: ResetStyle? = null
+
     // ------------------------------------------------------------------ session
 
     /**
-     * Reset the deck into the ROM bootloader and sync. Retries the classic
-     * reset/sync dance a handful of times, then returns what answered.
+     * Get the deck into its ROM bootloader and read its chip info.
+     *
+     * Syncs first in case the deck is already in the loader (no reset, no
+     * reboot), then resets with the sequence the attached silicon understands —
+     * at most once per style, so a failed connect cannot leave the board
+     * restarting over and over.
      */
     fun connect(baudRate: Int, log: (String) -> Unit): ChipInfo {
         log("Connecting to the deck at $baudRate baud…")
+
+        // A deck already sitting in the ROM loader — left there by an earlier
+        // attempt, or one flashed moments ago — answers without any reset, so
+        // nothing restarts the board when there is no need to.
+        identifyLoaded(1500)?.let { info ->
+            log("Detected ${info.name} (already in the loader).")
+            return info
+        }
+
+        // There are three ways a board responds to DTR/RTS, and the deck does
+        // not announce which one it uses. Try each once, most likely first:
+        //   • the S3's own USB serial/JTAG decodes DTR/RTS itself;
+        //   • a CH340/CP210x auto-reset circuit drives EN from RTS and IO0 from
+        //     DTR (esptool's standard wiring);
+        //   • some boards wire those two the other way round.
+        // Each style ends with the board out of reset, so a miss is just one
+        // restart, not the seven that looked like a reboot loop.
+        val order = if (usb.isUsbJtagLoader()) USB_FIRST else UART_FIRST
+
         var lastError: String? = null
-        for (attempt in 1..7) {
+        for (style in order) {
             try {
-                enterBootloader()
+                log("Resetting with the ${style.label} sequence…")
+                reset(style)
                 flushInput()
                 sync(1500)
                 val info = identify()
-                log("Detected ${info.name}.")
+                workingStyle = style
+                log("Detected ${info.name} (${style.label} reset).")
                 return info
             } catch (t: Throwable) {
                 lastError = t.message ?: t.javaClass.simpleName
-                log("Attempt $attempt failed: $lastError")
-                sleep(120)
+                log("No answer after the ${style.label} reset: $lastError")
+                sleep(80)
             }
         }
-        throw IOException("Could not sync with the deck. ${lastError ?: ""}".trim())
+
+        // Never leave the board parked in reset after a failed connect.
+        runCatching { hardReset() }
+        throw IOException(
+            "Could not sync with the deck. Tried ${order.size} reset styles; last said: " +
+                "${lastError ?: "no answer"}",
+        )
     }
 
-    /** Drop the chip back into the running application. */
+    /** Identify without touching the reset lines; null when not in the loader. */
+    private fun identifyLoaded(timeoutMs: Int): ChipInfo? = try {
+        flushInput()
+        sync(timeoutMs)
+        identify()
+    } catch (t: Throwable) {
+        null
+    }
+
+    /**
+     * Drop the chip back into the running application: pulse reset without
+     * pulling IO0 low, using whichever line drives EN on this board.
+     */
     fun hardReset() {
-        runCatching { usb.setSignals(dtr = false, rts = true, breakSignal = null) }
+        val style = workingStyle ?: if (usb.isUsbJtagLoader()) ResetStyle.USB_JTAG else ResetStyle.CLASSIC
+        runCatching {
+            when (style) {
+                ResetStyle.INVERTED -> usb.setSignals(dtr = true, rts = false, breakSignal = null)
+                else -> usb.setSignals(dtr = false, rts = true, breakSignal = null)
+            }
+        }
         sleep(120)
         runCatching { usb.setSignals(dtr = false, rts = false, breakSignal = null) }
         sleep(50)
@@ -123,7 +190,15 @@ class EspFlasher(private val usb: UsbSerialService) {
             return
         }
 
-        if (compress) {
+        val chunks = (uncsize + WRITE_CHUNK_SIZE - 1) / WRITE_CHUNK_SIZE
+        if (compress && chunks > 1) {
+            log(
+                "The image needs $chunks chunks, so it is written uncompressed:" +
+                    " one long compressed erase stalls on the ROM loader.",
+            )
+        }
+
+        if (compress && chunks == 1) {
             val packed = deflate(padded)
             log("Compressed $uncsize bytes to ${packed.size} bytes.")
             flashDeflBegin(uncsize, packed.size, offset, log)
@@ -138,21 +213,37 @@ class EspFlasher(private val usb: UsbSerialService) {
                 seq++
                 progress((sent * 100) / packed.size)
             }
+            flashFinish(stayInLoader = true)
         } else {
-            flashBegin(uncsize, offset, log)
-            var seq = 0
-            var sent = 0
-            while (sent < uncsize) {
+            // Erase and write a chunk at a time. One FlashBegin for a whole
+            // image makes the ROM erase everything in a single long call, which
+            // on this deck never comes back; short chunks answer straight away
+            // and the progress bar actually moves.
+            if (chunks > 1) {
+                log("Writing in $chunks chunks of ${WRITE_CHUNK_SIZE / 1024} KB…")
+            }
+            var done = 0
+            while (done < uncsize) {
                 if (isCancelled()) throw CancelledException()
-                val n = minOf(FLASH_WRITE_SIZE, uncsize - sent)
-                var block = padded.copyOfRange(sent, sent + n)
-                if (block.size < FLASH_WRITE_SIZE) {
-                    block = padTo(block, FLASH_WRITE_SIZE, 0xff)
+                val end = minOf(done + WRITE_CHUNK_SIZE, uncsize)
+                val chunk = padded.copyOfRange(done, end)
+                flashBegin(chunk.size, offset + done, log)
+                var seq = 0
+                var sent = 0
+                while (sent < chunk.size) {
+                    if (isCancelled()) throw CancelledException()
+                    val n = minOf(FLASH_WRITE_SIZE, chunk.size - sent)
+                    var block = chunk.copyOfRange(sent, sent + n)
+                    if (block.size < FLASH_WRITE_SIZE) {
+                        block = padTo(block, FLASH_WRITE_SIZE, 0xff)
+                    }
+                    flashBlock(block, seq)
+                    sent += n
+                    seq++
+                    progress(((done + sent) * 100) / uncsize)
                 }
-                flashBlock(block, seq)
-                sent += n
-                seq++
-                progress((sent * 100) / uncsize)
+                done = end
+                flashFinish(stayInLoader = true)
             }
         }
 
@@ -200,6 +291,11 @@ class EspFlasher(private val usb: UsbSerialService) {
     /** Optionally lift the link to [target] baud; falls back to 115200 on doubt. */
     fun changeBaud(target: Int, log: (String) -> Unit) {
         if (target <= 0) return
+        if (usb.isUsbJtagLoader()) {
+            // The link is USB, not a UART: there is no baud rate to raise.
+            log("Native USB: the baud rate does not apply, staying as is.")
+            return
+        }
         try {
             command(ESP_CHANGE_BAUDRATE, int32(target.toLong()) + int32(0), 0, 3000)
             sleep(50)
@@ -219,19 +315,39 @@ class EspFlasher(private val usb: UsbSerialService) {
     private fun flashBegin(size: Int, offset: Long, log: (String) -> Unit) {
         val blocks = (size + FLASH_WRITE_SIZE - 1) / FLASH_WRITE_SIZE
         log("Erasing ${size} bytes at 0x${offset.toString(16)}…")
+        val started = System.currentTimeMillis()
         val pkt = int32(size.toLong()) +
             int32(blocks.toLong()) +
             int32(FLASH_WRITE_SIZE.toLong()) +
             int32(offset) +
             int32(0)
-        checkCommand(
-            "enter Flash download mode",
-            ESP_FLASH_BEGIN,
-            pkt,
-            0,
-            0,
-            timeoutPerMb(ERASE_TIMEOUT_PER_MB, size.toLong()),
-        )
+        try {
+            checkCommand(
+                "enter Flash download mode",
+                ESP_FLASH_BEGIN,
+                pkt,
+                0,
+                0,
+                eraseTimeout(size.toLong()),
+            )
+        } catch (t: IOException) {
+            throw IOException("Erase did not finish: ${t.message}", t)
+        }
+        log("Erased in ${secondsSince(started)} s.")
+    }
+
+    /** Close the write cycle so the ROM accepts the next FlashBegin. */
+    private fun flashFinish(stayInLoader: Boolean) {
+        runCatching {
+            checkCommand(
+                "leave Flash download mode",
+                ESP_FLASH_END,
+                int32(if (stayInLoader) 1L else 0L),
+                0,
+                0,
+                2000,
+            )
+        }
     }
 
     private fun flashBlock(data: ByteArray, seq: Int) {
@@ -249,20 +365,33 @@ class EspFlasher(private val usb: UsbSerialService) {
         val eraseBlocks = (size + FLASH_WRITE_SIZE - 1) / FLASH_WRITE_SIZE
         val writeSize = eraseBlocks * FLASH_WRITE_SIZE
         log("Erasing ${writeSize} bytes at 0x${offset.toString(16)}…")
+        val started = System.currentTimeMillis()
         val pkt = int32(writeSize.toLong()) +
             int32(blocks.toLong()) +
             int32(FLASH_WRITE_SIZE.toLong()) +
             int32(offset) +
             int32(0)
-        checkCommand(
-            "enter compressed flash mode",
-            ESP_FLASH_DEFL_BEGIN,
-            pkt,
-            0,
-            0,
-            timeoutPerMb(ERASE_TIMEOUT_PER_MB, writeSize.toLong()),
-        )
+        try {
+            checkCommand(
+                "enter compressed flash mode",
+                ESP_FLASH_DEFL_BEGIN,
+                pkt,
+                0,
+                0,
+                eraseTimeout(writeSize.toLong()),
+            )
+        } catch (t: IOException) {
+            throw IOException("Erase did not finish: ${t.message}", t)
+        }
+        log("Erased in ${secondsSince(started)} s.")
     }
+
+    /** Erase waits are per chunk now, so they can be tight without stalling. */
+    private fun eraseTimeout(sizeBytes: Long): Long =
+        maxOf(15000L, timeoutPerMb(ERASE_TIMEOUT_PER_MB, sizeBytes))
+
+    private fun secondsSince(startedAt: Long): String =
+        "%.1f".format((System.currentTimeMillis() - startedAt) / 1000.0)
 
     private fun flashDeflBlock(data: ByteArray, seq: Int) {
         val pkt = int32(data.size.toLong()) +
@@ -349,8 +478,14 @@ class EspFlasher(private val usb: UsbSerialService) {
     }
 
     private fun readPacket(op: Int?, timeoutMs: Int): Response {
-        for (attempt in 0 until 100) {
-            val packet = readSlipPacket(timeoutMs)
+        // One budget for the whole call: a stray packet from an earlier command
+        // must not restart the timer, which turned a 15 s erase wait into
+        // hundreds of seconds of apparent hang.
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (true) {
+            val remaining = (deadline - System.currentTimeMillis()).toInt()
+            if (remaining <= 0) throw IOException("Invalid response from the deck.")
+            val packet = readSlipPacket(remaining)
             if (packet.size < 8) continue
             if ((packet[0].toInt() and 0xff) != 1) continue
             val opRet = packet[1].toInt() and 0xff
@@ -405,8 +540,16 @@ class EspFlasher(private val usb: UsbSerialService) {
                 val remaining = (deadline - System.currentTimeMillis()).toInt()
                 if (remaining <= 0) {
                     throw IOException(
-                        if (packet == null) "No serial data received."
-                        else "Timed out waiting for the deck.",
+                        when {
+                            packet != null -> "Timed out waiting for the deck."
+                            // Open port, silent line: either the deck stopped
+                            // answering or it left the bus entirely (a reset
+                            // re-enumerates native USB). Those need different
+                            // fixes, so they read differently here.
+                            !usb.isDeviceAttached() ->
+                                "The deck left USB (it reset or was unplugged). Reconnect it, then tap CONNECT."
+                            else -> "No serial data received."
+                        },
                     )
                 }
                 val tmp = ByteArray(4096)
@@ -423,17 +566,72 @@ class EspFlasher(private val usb: UsbSerialService) {
         cmd[2] = 0x12
         cmd[3] = 0x20
         for (i in 4 until 36) cmd[i] = 0x55
-        command(ESP_SYNC, cmd, 0, timeoutMs)
-        repeat(7) { readPacket(ESP_SYNC, timeoutMs) }
+
+        // The ROM may still be booting when the first frame arrives, so keep
+        // asking until the deadline rather than resetting the board again.
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var lastError: Throwable? = null
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                command(ESP_SYNC, cmd, 0, 400)
+                // The ROM answers a sync with a short burst; drain what is there.
+                repeat(7) { runCatching { readPacket(ESP_SYNC, 120) } }
+                return
+            } catch (t: Throwable) {
+                lastError = t
+                sleep(60)
+            }
+        }
+        throw IOException(lastError?.message ?: "The deck did not answer the sync.")
     }
 
-    private fun enterBootloader() {
-        usb.setSignals(dtr = false, rts = true, breakSignal = null)
+    /** Which reset dance the attached board understands. */
+    private enum class ResetStyle(val label: String) {
+        CLASSIC("UART (EN on RTS)"),
+        INVERTED("UART (EN on DTR)"),
+        USB_JTAG("USB-JTAG"),
+    }
+
+    private fun reset(style: ResetStyle) {
+        when (style) {
+            ResetStyle.CLASSIC -> classicReset(inverted = false)
+            ResetStyle.INVERTED -> classicReset(inverted = true)
+            ResetStyle.USB_JTAG -> usbJtagReset()
+        }
+        // The ROM needs a moment to come up before the first sync frame.
+        sleep(150)
+    }
+
+    /**
+     * EN/IO0 pulse for a bridge wired to an auto-reset circuit. [inverted] swaps
+     * which DTR/RTS line drives EN, for boards that wire it the other way round.
+     */
+    private fun classicReset(inverted: Boolean) {
+        val io0Low = !inverted // DTR pulls IO0 low on the standard wiring
+        usb.setSignals(dtr = !io0Low, rts = io0Low, breakSignal = null) // EN low
+        sleep(100)
+        usb.setSignals(dtr = io0Low, rts = !io0Low, breakSignal = null) // IO0 low, EN high
+        sleep(50)
+        usb.setSignals(dtr = false, rts = false, breakSignal = null) // release IO0
+        sleep(50)
+    }
+
+    /**
+     * The ESP32-S3 USB serial/JTAG has no EN/IO0 pins to pulse: its peripheral
+     * watches the DTR/RTS pattern and resets the chip from it. This is esptool's
+     * sequence, including the repeated RTS edge Windows needs to propagate it.
+     */
+    private fun usbJtagReset() {
+        usb.setSignals(dtr = false, rts = false, breakSignal = null)
         sleep(100)
         usb.setSignals(dtr = true, rts = false, breakSignal = null)
-        sleep(50)
+        sleep(100)
+        usb.setSignals(dtr = true, rts = true, breakSignal = null)
+        usb.setSignals(dtr = false, rts = true, breakSignal = null)
+        usb.setSignals(dtr = false, rts = true, breakSignal = null)
+        sleep(100)
         usb.setSignals(dtr = false, rts = false, breakSignal = null)
-        sleep(50)
+        sleep(100)
     }
 
     private fun flushInput() {

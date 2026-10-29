@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Attaky flash engine</title>
+</head>
+<body>
+  <!--
+    Never shown. The native flasher screen loads this page off-screen so it can
+    drive the deck with the same esptool-js build the store pages use
+    (vendor/esptool-js.js) over the same Web Serial bridge (js/webserial.js).
+    js/native-flash.js is the small glue: connect, flash, reset.
+  -->
+  <script src="vendor/esptool-js.js"></script>
+  <script src="js/webserial.js"></script>
+  <script src="js/native-flash.js"></script>
+</body>
+</html>

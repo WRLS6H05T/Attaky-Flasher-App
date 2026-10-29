@@ -42,6 +42,11 @@ class SerialBridge(
     interface FirmwareStore {
         fun listJson(): String
         fun delete(name: String): Boolean
+
+        /** Download every part of one store firmware, merge them by flash
+         *  address and keep a single image. `"ok"` once queued, else
+         *  `"error: …"`. */
+        fun downloadMerged(requestJson: String): String
     }
 
     companion object {
@@ -229,4 +234,14 @@ class SerialBridge(
     @JavascriptInterface
     fun deleteFirmware(name: String): String =
         if (firmwareStore.delete(name)) "ok" else "not found"
+
+    /**
+     * Merge-on-download from a store page (see assets/www/js/store-merge.js).
+     * The page sends the firmware's parts — `{title, parts:[{name, url, offset}]}` —
+     * and the app fetches them all, joins them into one image and keeps that.
+     *
+     * @return "ok" once the download is queued, else "error: …".
+     */
+    @JavascriptInterface
+    fun downloadMerged(requestJson: String): String = firmwareStore.downloadMerged(requestJson)
 }

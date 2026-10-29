@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -21,8 +22,10 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import android.view.animation.DecelerateInterpolator
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -90,6 +93,9 @@ class MainActivity : AppCompatActivity() {
 
         /** How long the branded splash stays up before the next screen. */
         private const val SPLASH_MS = 1400L
+
+        /** How long the splash logo takes to shrink into the main page's logo. */
+        private const val MORPH_MS = 480L
 
         /** Escape hatch on the store pages: leave the web view for the native
          *  flasher, which runs its own ROM-bootloader engine offline. In the
@@ -179,6 +185,9 @@ class MainActivity : AppCompatActivity() {
     /** Cached copy of the Web Serial polyfill injected into store pages. */
     private var polyfillJs: String? = null
 
+    /** Cached copy of the store script that merges part downloads into one image. */
+    private var storeMergeJs: String? = null
+
     /** Only fall back to the bundled page on the first store load failure. */
     private var storeFallbackDone = false
 
@@ -193,18 +202,11 @@ class MainActivity : AppCompatActivity() {
     /** The native "Downloaded firmware" flasher, while it owns the screen. */
     private var nativeFlasher: NativeFlasher? = null
 
+    /** The ESP serial console on the main page, while that page is on screen. */
+    private var serialMonitor: SerialMonitor? = null
+
     /** Where back lands when the native flasher closes. */
     private var flasherReturnStage = Stage.CHOICE
-
-    private var pendingBinCallback: ((List<Uri>) -> Unit)? = null
-
-    /** Local .bin picker for the native flasher (separate from the WebView one). */
-    private val binLauncher =
-        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-            val callback = pendingBinCallback
-            pendingBinCallback = null
-            callback?.invoke(uris ?: emptyList())
-        }
 
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -277,6 +279,21 @@ class MainActivity : AppCompatActivity() {
             },
         )
         service.listener = bridge
+
+        // A merged download from a store page finishes in the background.
+        downloads.onMerged = { ok, detail, location ->
+            if (ok) {
+                val message = if (location != null) {
+                    getString(R.string.download_saved_merged, detail, location)
+                } else {
+                    getString(R.string.download_saved, detail)
+                }
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                if (stage == Stage.APP) bridge.onFirmwareChanged()
+            } else {
+                Toast.makeText(this, getString(R.string.download_failed, detail), Toast.LENGTH_LONG).show()
+            }
+        }
 
         // Must be registered before the first page load.
         webView.addJavascriptInterface(bridge, "AttakyUSB")
@@ -462,7 +479,8 @@ class MainActivity : AppCompatActivity() {
     /** Splash: the lockup rises in, then the next screen takes over. */
     private fun showSplash() {
         stage = Stage.SPLASH
-        val view = setBootScreen(R.layout.view_splash)
+        val view = layoutInflater.inflate(R.layout.view_splash, bootHost, false)
+        setBootScreen(view)
         setVersion(view)
 
         val lockup = view.findViewById<View>(R.id.splashLockup)
@@ -475,14 +493,121 @@ class MainActivity : AppCompatActivity() {
         }, SPLASH_MS)
     }
 
+    /**
+     * Hand the splash over to the main page.
+     *
+     * One splash, one logo: the big centred splash logo does not cut to the
+     * smaller one at the top of the main page, it shrinks into its place while
+     * the page fades up around it. A floating copy of the logo does the travel
+     * (so nothing gets clipped by the lockup it starts in), the page lands under
+     * it, and the page's own logo takes over the instant it arrives.
+     */
     private fun afterSplash() {
-        showChoice()
+        if (stage != Stage.SPLASH) return
+        val splash = bootHost.getChildAt(0)
+        val logo = splash?.findViewById<View>(R.id.splashLogo)
+        if (splash == null || logo == null) {
+            showChoice()
+            return
+        }
+
+        stage = Stage.CHOICE
+        val choice = buildChoiceScreen()
+        choice.alpha = 0f
+        // Added first, so the splash draws over it until the fade begins.
+        bootHost.addView(choice, 0)
+
+        val target = choice.findViewById<View>(R.id.choiceLogo)
+        target.alpha = 0f
+
+        val wordmark = splash.findViewById<View>(R.id.splashWordmark)
+        val version = splash.findViewById<View>(R.id.bootVersion)
+        wordmark?.animate()?.alpha(0f)?.setDuration(180L)?.start()
+        version?.animate()?.alpha(0f)?.setDuration(180L)?.start()
+
+        bootHost.post {
+            if (isFinishing || isDestroyed) return@post
+            val from = rectInHost(logo)
+            val to = rectInHost(target)
+            if (from.width() <= 0 || to.width() <= 0) {
+                finishBootTransition(splash, choice, target, null)
+                return@post
+            }
+
+            val overlay = ImageView(this).apply {
+                setImageResource(R.drawable.attaky_logo)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+            }
+            bootHost.addView(
+                overlay,
+                FrameLayout.LayoutParams(from.width(), from.height()).apply {
+                    leftMargin = from.left
+                    topMargin = from.top
+                },
+            )
+            logo.alpha = 0f
+
+            val scale = to.width().toFloat() / from.width().toFloat()
+            val dx = (to.exactCenterX() - from.exactCenterX())
+            val dy = (to.exactCenterY() - from.exactCenterY())
+
+            overlay.animate()
+                .scaleX(scale)
+                .scaleY(scale)
+                .translationX(dx)
+                .translationY(dy)
+                .setDuration(MORPH_MS)
+                .setInterpolator(DecelerateInterpolator())
+                .start()
+
+            // The page arrives with it, and the splash clears once the logo has
+            // landed so only one logo is ever on screen.
+            choice.animate()
+                .alpha(1f)
+                .setDuration(MORPH_MS)
+                .withEndAction {
+                    finishBootTransition(splash, choice, target, overlay)
+                }
+                .start()
+            splash.animate()
+                .alpha(0f)
+                .setStartDelay((MORPH_MS - 150L).coerceAtLeast(0L))
+                .setDuration(150L)
+                .start()
+        }
+    }
+
+    private fun finishBootTransition(
+        splash: View,
+        choice: View,
+        target: View,
+        overlay: View?,
+    ) {
+        if (isFinishing || isDestroyed) return
+        overlay?.let { bootHost.removeView(it) }
+        target.alpha = 1f
+        choice.alpha = 1f
+        bootHost.removeView(splash)
+    }
+
+    /** [child]'s bounds in [bootHost] coordinates. */
+    private fun rectInHost(child: View): Rect {
+        val hostAt = IntArray(2).also { bootHost.getLocationInWindow(it) }
+        val childAt = IntArray(2).also { child.getLocationInWindow(it) }
+        val left = childAt[0] - hostAt[0]
+        val top = childAt[1] - hostAt[1]
+        return Rect(left, top, left + child.width, top + child.height)
     }
 
     /** Every launch asks; the answer is a session choice, never stored. */
     private fun showChoice() {
         stage = Stage.CHOICE
-        val view = setBootScreen(R.layout.view_choice)
+        setBootScreen(buildChoiceScreen())
+    }
+
+    /** Inflate the main page and wire its tiles and its serial console. */
+    private fun buildChoiceScreen(): View {
+        val view = layoutInflater.inflate(R.layout.view_choice, bootHost, false)
         setVersion(view)
 
         view.findViewById<View>(R.id.tileStore).setOnClickListener {
@@ -491,9 +616,23 @@ class MainActivity : AppCompatActivity() {
         view.findViewById<View>(R.id.tileBundled).setOnClickListener {
             openNativeFlasher(fromChooser = true)
         }
+
+        val monitor = SerialMonitor(this, service, view)
+        serialMonitor = monitor
+        service.monitorListener = monitor
+        monitor.start()
+        return view
+    }
+
+    /** The serial console holds the port; hand it back before anything else uses it. */
+    private fun closeSerialMonitor() {
+        service.monitorListener = null
+        serialMonitor?.stop()
+        serialMonitor = null
     }
 
     private fun startApp(url: String) {
+        closeSerialMonitor()
         stage = Stage.APP
         storeFallbackDone = false
         // Emptying the overlay reveals the WebView with the flasher page.
@@ -501,9 +640,8 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(url)
     }
 
-    /** Inflate a boot screen into the overlay, replacing whatever was there. */
-    private fun setBootScreen(layoutRes: Int): View {
-        val view = layoutInflater.inflate(layoutRes, bootHost, false)
+    /** Put a boot screen in the overlay, replacing whatever was there. */
+    private fun setBootScreen(view: View): View {
         bootHost.removeAllViews()
         bootHost.addView(view)
         return view
@@ -537,6 +675,9 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // The console on the main page holds the port; the flasher needs it.
+        closeSerialMonitor()
+
         flasherReturnStage = if (stage == Stage.APP) Stage.APP else Stage.CHOICE
         stage = Stage.FLASHER
 
@@ -550,7 +691,6 @@ class MainActivity : AppCompatActivity() {
             downloads = downloads,
             prefs = prefs,
             root = view,
-            pickFiles = ::pickBinFiles,
             onExit = { closeNativeFlasher() },
             onOpenStore = { openStore() },
         )
@@ -576,12 +716,6 @@ class MainActivity : AppCompatActivity() {
         nativeFlasher?.stop()
         nativeFlasher = null
         startApp(storeUrl())
-    }
-
-    /** Local .bin picker for the native screen, via the system documents UI. */
-    private fun pickBinFiles(mimeTypes: Array<String>, callback: (List<Uri>) -> Unit) {
-        pendingBinCallback = callback
-        binLauncher.launch(mimeTypes)
     }
 
     // ------------------------------------------------------------------ routing
@@ -632,10 +766,16 @@ class MainActivity : AppCompatActivity() {
         // A hosted copy of the flasher page already ships webserial.js; running it
         // twice would drop the handlers app.js wrapped on window.__attaky.
         webView.evaluateJavascript(
-            "if (!window.attakySerial) {\n$polyfill\n}\n$STORE_ESCAPE_JS",
+            "if (!window.attakySerial) {\n$polyfill\n}\n$STORE_ESCAPE_JS\n${storeMerge()}",
             null,
         )
     }
+
+    /** The store script that turns part downloads into one merged image. */
+    private fun storeMerge(): String = storeMergeJs ?: assets.open("www/js/store-merge.js")
+        .bufferedReader()
+        .use { it.readText() }
+        .also { storeMergeJs = it }
 
     private fun isHttpUrl(url: String): Boolean =
         url.startsWith("http://") || url.startsWith("https://")
@@ -736,10 +876,16 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         // Coming back from the system USB-permission dialog: refresh the scan.
-        if (stage == Stage.APP) bridge.onUsbEvent("resume")
+        when (stage) {
+            Stage.APP -> bridge.onUsbEvent("resume")
+            // A deck plugged in while the app was in the background shows up too.
+            Stage.CHOICE -> serialMonitor?.refresh()
+            else -> Unit
+        }
     }
 
     override fun onDestroy() {
+        closeSerialMonitor()
         nativeFlasher?.stop()
         nativeFlasher = null
         service.stop()
