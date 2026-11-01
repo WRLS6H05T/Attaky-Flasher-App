@@ -7,7 +7,6 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -30,6 +29,9 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebResourceErrorCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewClientCompat
@@ -244,6 +246,20 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Apps targeting 35+ are drawn edge to edge, so the window no longer insets
+        // its content for us. Pad the root explicitly: the boot screens and the
+        // page stay clear of the status bar, navigation bar and any display cutout
+        // instead of sliding underneath them.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val root = findViewById<View>(R.id.root)
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
+            )
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+
         bootHost = findViewById(R.id.bootHost)
 
         // Flashing takes a minute or two; do not let the screen sleep mid-write.
@@ -345,9 +361,9 @@ class MainActivity : AppCompatActivity() {
             mediaPlaybackRequiresUserGesture = true
             cacheMode = WebSettings.LOAD_DEFAULT
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-        }
+        // Mixed content is allowed through in compatibility mode; minSdk 24 makes
+        // the setting available on every supported device.
+        webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
         if (BuildConfig.DEBUG) {
             WebView.setWebContentsDebuggingEnabled(true)
         }
@@ -423,21 +439,6 @@ class MainActivity : AppCompatActivity() {
                     "code $code"
                 }
                 fallbackToBundled(reason)
-            }
-
-            /** API 21/22: only the legacy callback exists. */
-            @Suppress("DEPRECATION")
-            override fun onReceivedError(
-                view: WebView,
-                errorCode: Int,
-                description: String?,
-                failingUrl: String?,
-            ) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) return
-                if (storeFallbackDone || failingUrl == null) return
-                if (!isHttpUrl(failingUrl) || isLocalUrl(failingUrl)) return
-                if (!isSiteUrl(failingUrl)) return
-                fallbackToBundled("$errorCode $description")
             }
         }
 

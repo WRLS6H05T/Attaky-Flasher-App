@@ -28,13 +28,13 @@ app/src/main/assets/www/
 
 ## Build
 
-Requires Android Studio (Jellyfish or newer) with Android SDK 34. No other
+Requires a current Android Studio with Android SDK 37 (Android 17). No other
 tooling — no baud-rate config, no Windows drivers; the app is plain USB Host.
 
 1. Open this directory (`AndroidStudioProjects/AttakyFlasher/`) in Android Studio.
-2. Let Gradle sync. The wrapper pins Gradle 9.6, the plugins are AGP 9.4.1 /
-   Kotlin 2.2.10 (`build.gradle.kts`), the daemon JVM is JetBrains Runtime 21
-   (`gradle/gradle-daemon-jvm.properties`) and the app targets Java 17 bytecode.
+2. Let Gradle sync. The wrapper pins Gradle 9.8.2; AGP 9.5.0 and its built-in Kotlin
+   support compile the app (`build.gradle.kts`), the daemon JVM is JetBrains
+   Runtime 21 and the app targets Java 17 bytecode against API 37 (min API 24).
 3. Run on a device with USB debugging enabled (OTG cable not required — your
    phone IS the host; use a USB-C host cable if your phone's port is not full
    size). From the command line:
@@ -146,6 +146,9 @@ The license is kept at `app/src/main/assets/www/vendor/esptool-js.LICENSE.txt`.
 ## Notes / limitations
 
 - USB Host requires a phone with USB-OTG support and a data cable.
+- Edge-to-edge is enforced from targetSdk 35 on, so `activity_main.xml` no longer
+  relies on `fitsSystemWindows`: the root view pads itself from the system-bar
+  and display-cutout insets in `MainActivity.onCreate`.
 - The store pages are the live Django site; the polyfill is injected with
   `evaluateJavascript`, which bypasses the page's Content-Security-Policy
   (nonces and ES modules are left untouched). Styles injected into the store
