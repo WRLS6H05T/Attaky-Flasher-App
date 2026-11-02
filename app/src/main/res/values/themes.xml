@@ -24,6 +24,8 @@
           its proper size a frame later. values-night clears the icon entirely.
         -->
         <item name="android:windowSplashScreenBackground">@color/attaky_boot_bg</item>
+        <!-- Dark status-bar icons on the white surface (minSdk 24). -->
+        <item name="android:windowLightStatusBar">true</item>
         <!-- The accent only reaches the sign-out dialog's buttons. -->
         <item name="colorAccent">@color/attaky_red</item>
     </style>

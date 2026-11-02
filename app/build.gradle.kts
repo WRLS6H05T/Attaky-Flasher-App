@@ -1,16 +1,17 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 android {
     namespace = "com.attaky.flasher"
-    compileSdk = 34
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.attaky.flasher"
-        minSdk = 21
-        targetSdk = 34
+        minSdk = 24
+        targetSdk = 37
         versionCode = 17
         // Shown on the splash screen under the wordmark, e.g. "V0.1.0-A001".
         versionName = "0.1.5-A006"
@@ -35,10 +36,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         buildConfig = true
     }
@@ -50,15 +47,22 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
-    // The FAT32 writer can corrupt a card if it is wrong, so it is tested on the
-    // JVM against a card image instead of only on a device.
+    // The launcher's wire protocol and the OTA manifest are plain Kotlin with no
+    // Android in them, so they are tested on the JVM against a fake launcher
+    // instead of only against a core on the bench.
     testImplementation("junit:junit:4.13.2")
     // Real org.json on the JVM: the mockable android.jar stub would throw.
     testImplementation("org.json:json:20240303")
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("androidx.webkit:webkit:1.11.0")
-    // USB-serial drivers: CH34x (Attaky deck USB-C), CP210x, FTDI, CDC-ACM, PL2303.
-    implementation("com.github.mik3y:usb-serial-for-android:3.9.0")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.appcompat:appcompat:1.8.0")
+    implementation("androidx.webkit:webkit:1.18.0")
+    // USB-serial drivers: CH34x (Attaky core USB-C), CP210x, FTDI, CDC-ACM, PL2303.
+    implementation("com.github.mik3y:usb-serial-for-android:3.11.0")
 }
