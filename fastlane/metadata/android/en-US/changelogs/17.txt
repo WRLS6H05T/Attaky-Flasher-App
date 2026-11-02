@@ -1,0 +1,5 @@
+* Launcher Web UI: find the core on your network, send merged images to its SD card, or install them into its app slot over OTA.
+* Settings: light or dark, full screen, text size, and the text colour — which now paints the action buttons too.
+* ESP serial prints the raw hex of everything received and sent, below the text.
+* Every label now says core rather than deck.
+* Dark phones no longer launch on a white splash with a squashed logo.

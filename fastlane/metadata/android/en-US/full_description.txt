@@ -1,20 +1,27 @@
-Attaky Flasher writes firmware to the Attaky Cyber Deck (ESP32-S3) over its USB-C port, straight from your phone. Plug the deck in and the phone acts as the USB host — no computer and no desktop toolchain required.
+Attaky Flasher puts firmware on your Attaky core (ESP32-S3) from your phone: over USB-C, over WiFi, or straight from the live store. Plug the core in and the phone is the USB host — no computer and no desktop toolchain required.
 
-Two ways to get firmware onto the deck:
+Three ways to get firmware onto the core:
 
-* Firmware store — browse the catalogue at fwstore.attaky.com inside the app and use the store's own "Flash Online" flow. The app backs the store's Web Serial calls with Android's USB Host API, so the download and the flash both happen on the phone.
-* Fully offline — open the native flasher to flash images the store already saved on this device, or pick your own .bin files with a per-file flash offset. Nothing is uploaded and no network is needed.
+* Firmware store — browse the catalogue at fwstore.attaky.com inside the app and use the store's own "Flash Online" flow. The app backs the store's Web Serial calls with Android's USB Host API, so the download and the flash both happen on the phone. Firmware already on the phone is marked in the listing, so you can see what is ready to flash offline.
+* Fully offline — the native flasher writes images the store already saved, merging split bootloader / partition / app downloads into one image first. Nothing is uploaded and no network is needed.
+* Launcher Web UI — find the core on your WiFi network and send the merged image to its SD card, or install it into the core's app slot over OTA so the card and its contents are left alone. The core's web login is remembered.
 
-The native flasher is written in Kotlin and speaks the ESP32-S3 ROM bootloader protocol directly, with a live progress bar, a console log, chip info, and advanced options (baud rate, verify, compress).
+Also included:
+
+* An ESP serial console that prints the raw hex of everything sent and received, sixteen bytes to a line — button presses and control codes included.
+* Settings for light or dark, full screen, text size from 85% to 145%, and the text colour, which also paints the action buttons.
+
+The native screens are written in Kotlin and the flashing engine is esptool-js, with a live progress bar, a console log, chip info, and advanced options (baud rate, verify, compress). Flashing asks before erasing and warns before a write is abandoned.
 
 Highlights:
 
-* Store-first: the live catalogue is the home screen, with a native escape button to the offline flasher.
+* Store, offline flasher and WiFi in one app, with a single menu between them.
 * Offline flashing of downloaded images or local .bin files.
 * Native ESP32-S3 flashing over USB (CH340, CP210x, FTDI, CDC-ACM).
 * Reads chip info and verifies every image before it is written.
+* Dark theme and dark boot screen.
 * No account, no analytics, no tracking.
 
-Compatibility: requires a phone with USB Host (USB-OTG) support and an Attaky deck or another ESP32-S3 board.
+Compatibility: requires a phone with USB Host (USB-OTG) support and an Attaky core or another ESP32-S3 board. The WiFi screen needs the core on the same network with its Launcher Web UI open.
 
 Attaky Flasher is free and open-source software, licensed under the Apache License 2.0.

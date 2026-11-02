@@ -1,1 +1,1 @@
-Flash Attaky deck firmware over USB, from the store or fully offline.
+Flash Attaky core firmware over USB or WiFi, from the store or fully offline.
