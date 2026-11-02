@@ -46,32 +46,114 @@ tooling — no baud-rate config, no Windows drivers; the app is plain USB Host.
 
 ## Use
 
-1. Open **Attaky Flasher**. After the splash you get a two-tile chooser:
-   **FIRMWARE STORE** or **DOWNLOADED FIRMWARE**.
+1. Open **Attaky Flasher**. After the splash you get the chooser:
+   **FIRMWARE STORE** and **DOWNLOADED FIRMWARE**. A third tile, **LAUNCHER WEB
+   UI**, appears only once a deck answers on the network — while the menu is up it
+   looks for one every ten seconds (the remembered address each time, a full /24
+   sweep at most once a minute), so a deck that boots late or comes back from an
+   OTA restart brings the tile in without the app being restarted. The tile shows
+   the address it was found at, so the menu never offers a screen that has no deck
+   to talk to.
 2. **Firmware Store** — pick a firmware and tap **Flash Online**. The app shows
    the Android USB permission dialog and the store drives the whole
    download + flash.
 3. On any store page the header also carries an **⚡ Native Flasher** button
-   that opens the offline flasher directly.
+   that opens the offline flasher directly. The store's own three-bar menu
+   stays in the header at every width, so rotating to landscape does not swap
+   it for a row of inline links.
+   Once a firmware is on the phone the store says so: the page's hero button
+   reads   **Downloaded ✓ (merged for flasher)** with the saved file name under it
+   (tapping still downloads it again), and every card in the listing that is
+   already saved wears a small **Downloaded** chip. Downloads are matched by the
+   store's firmware id — `/firmware_details/50`, `/firmware/50/parts/…` — which
+   the app records in its index as `firmwareId`.
 4. **Downloaded Firmware** — the native screen:
    - **DECK → CONNECT** the deck (allow USB access the first time) to read chip info.
    - **DOWNLOADED FIRMWARE** lists images the store has saved on this device.
      A store download fetches every part and merges them by flash address into
      one image, so a firmware with separate bootloader / partition / app bins
-     flashes in a single pass. Each row has **Flash** and **Delete**; with none
-     saved a *No downloaded firmware* dialog appears and **OK** returns to the
-     chooser.
+     flashes in a single pass. Each row carries the firmware's own app icon —
+     the store page's hero icon, fetched once with the download and kept beside
+     the image as `<image>.icon.webp`, so the list looks right with no network —
+     with the Attaky mark standing in for images that have none. Each row has
+     **Flash** and **Delete**; with none saved a *No downloaded firmware* dialog
+     appears and **OK** returns to the chooser.
    - **ADVANCED** exposes baud rate, verify and compress.
    - Progress, chip info and a console log are shown on the same screen. A
      finished flash hard-resets the deck so it reboots into the new firmware,
      then closes the port.
+   - Flashing is guarded at both ends: **Flash** asks first and spells out that
+     the deck is erased and must not be unplugged, and while a write is running
+     the back arrow, system back and **FIRMWARE STORE** offer *Keep flashing* or
+     *Stop and leave*. Stopping closes the port under esptool, which fails the
+     write in flight — the deck can be left half-flashed, which the warning says.
    - The header button reads **FIRMWARE STORE** and takes you back to the store.
 5. **ESP serial** appears on the chooser when a USB serial device is attached:
    a scrolling console, a send box, and open/close port, for watching a running
    deck. The port is never taken on its own — a port open toggles DTR/RTS and
    would reset the board.
 
-There is no sign-in and no settings screen.
+6. **LAUNCHER WEB UI** — find your deck on the network and send bins to its SD
+   card, with no cable and no card reader. The tile is hidden until a deck is
+   heard from (a deck whose web password was changed on the device still counts:
+   it answers, so the screen says the login is what needs fixing). On the deck, open **MENU → Start Web User
+   Interface** and leave it on that screen; the phone finds it on the same WiFi
+   network.
+   - The screen sweeps the phone's own subnet — and the launcher's
+     `192.168.4.1` hotspot address — for a host that answers the launcher's
+     `/systeminfo` behind its web login. The sweep is waited out, not cut short:
+     an address found late is still reported. The deck then shows at its address
+     with its Launcher version and the card's free space. When the sweep finds
+     nothing it says which /24 it covered, and **Deck address** takes the address
+     the deck prints on its own screen with **CONNECT**, which is what to use
+     when the phone and the deck are not on the same subnet.
+   - **Deck web login** is the launcher's own WebUI login, shipped as
+     `admin` / `launcher` and changeable on the deck. It is remembered for the
+     next visit. The credential is only ever offered to a host that already
+     answered the launcher's `401 Unauthorized`, so other devices on the network
+     never see it.
+   - Each row in **Firmware on this phone** has a **+** that posts the image to
+     the card's root as a multipart upload — the same call the launcher's file
+     manager makes when a browser drops a file on it — with a progress bar, an
+     `ON THE DECK'S SD CARD` mark when it lands, and the deck re-read for its new
+     free space. Merged images are the point: the deck's SD flasher reads the
+     file exactly as if it had been copied on by hand.
+   - Leaving mid-transfer asks first. An aborted upload is discarded by the
+     deck, which deletes a body it did not receive in full, so no half file is
+     left on the card.
+   - **OTA** installs the image into the deck's own app slot instead of the
+     card: no card, no cable. The phone reads the merged image's partition table
+     (`0x8000`, `AA 50 01`), finds the app entry and measures the ESP image's
+     real length, then sends that as the launcher's `/OTA` manifest — the same
+     description its own WebUI builds — and streams the file to `/OTAFILE`. The
+     deck writes a spare slot, and is restarted with `/reboot` so the new
+     firmware actually runs. The app's data partitions are left out of the
+     update, so the deck keeps its settings and installed apps; an image with no
+     app part is refused before anything is written.
+
+   The wire format — login cookie, `/systeminfo`, multipart framing — lives in
+   `DeckProtocol`, which has no Android in it; `DeckProtocolTest` drives it
+   against a fake launcher on a socket.
+
+7. **SETTINGS**, top right of the chooser, changes the app's appearance only
+   (the store pages keep their own colours):
+   - **Theme** — light or dark. Dark repaints the page, the cards, the dialogs
+     (each one an outlined card in the dark palette, not a flat black panel),
+     the boot splash and swaps the wordmark for the dark artwork
+     (`attaky_logo_dark.png`) from the very first frame — the launch preview
+     window is switched off so a dark start never flashes white.
+   - **Full screen** — hides the status and navigation bars; swiping from the
+     edge brings them back.
+   - **Text size** — 85% to 145%, applied to every native screen.
+   - **Text colour** — a heading/value tone and a label/small-print tone for the
+     chooser and the native flasher, or *Automatic* to follow the theme.
+   - **Reset** puts everything back to the designed light look.
+
+   The palettes live in `colors.xml` and are applied by `AttakyTheme`, which walks
+   the finished view tree, so each layout is written once and tagged with the
+   role of each part (`attaky:card`, `attaky:ink`, `attaky:muted`, …).
+   `AppSettings` stores the choices in the same shared preferences as the
+   flasher's baud rate. There is no sign-in.
 
 ## Hosting the firmware catalogue
 
@@ -135,7 +217,7 @@ The license is kept at `app/src/main/assets/www/vendor/esptool-js.LICENSE.txt`.
 | `app/src/main/java/com/attaky/flasher/EspFlasher.kt` | Earlier hand-rolled ROM protocol, no longer used (superseded by `JsFlasher`) |
 | `app/src/main/java/com/attaky/flasher/UsbSerialService.kt` | USB enumeration, permission, open/write/signals, read loop |
 | `app/src/main/java/com/attaky/flasher/SerialBridge.kt` | `window.AttakyUSB` JS↔Java contract |
-| `app/src/main/java/com/attaky/flasher/FirmwareDownloads.kt` | App-local store of downloaded firmware images |
+| `app/src/main/java/com/attaky/flasher/FirmwareDownloads.kt` | App-local store of downloaded firmware images and their saved app icons |
 | `res/xml/usb_device_filter.xml` | USB-serial VID list for auto-attach |
 | `tools/vendor-esptool.js` | ESM→classic-script bundler for esptool-js |
 | `tools/gen-icons.ps1` | Launcher PNGs for API < 26 |
