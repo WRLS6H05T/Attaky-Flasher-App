@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Nothing, for the system's launch splash.
+
+  Android 12+ shows an icon there whatever the app asks for, and the only way to
+  have it show no mark at all is to hand it a drawable with no pixels in it. The
+  boot sequence then reads as one splash: a dark page, then the app's own splash,
+  whose logo is the one that travels into the menu.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>

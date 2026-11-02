@@ -8,6 +8,18 @@
     android:paddingTop="10dp"
     android:paddingBottom="10dp">
 
+    <!-- The firmware's own app icon, saved with the image so it works offline. -->
+    <ImageView
+        android:id="@+id/fwIcon"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginEnd="10dp"
+        android:contentDescription="@string/firmware_icon"
+        android:padding="5dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_launcher_foreground"
+        android:tag="attaky:well" />
+
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -21,7 +33,7 @@
             android:ellipsize="middle"
             android:fontFamily="@font/jetbrains_mono_regular"
             android:maxLines="2"
-            android:textColor="@color/attaky_ink"
+            android:tag="attaky:ink"
             android:textSize="12sp" />
 
         <TextView
@@ -30,7 +42,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"
             android:fontFamily="@font/switzer_regular"
-            android:textColor="@color/attaky_muted"
+            android:tag="attaky:muted"
             android:textSize="11sp" />
     </LinearLayout>
 
@@ -38,11 +50,13 @@
         android:id="@+id/fwFlash"
         style="@style/AttakyPrimaryButton"
         android:layout_marginStart="8dp"
+        android:tag="attaky:primary"
         android:text="FLASH" />
 
     <Button
         android:id="@+id/fwDelete"
         style="@style/AttakyButton"
         android:layout_marginStart="6dp"
+        android:tag="attaky:outline"
         android:text="DELETE" />
 </LinearLayout>

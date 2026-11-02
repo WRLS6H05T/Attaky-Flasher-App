@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The same window in the phone's night mode.
+
+  Everything on screen is repainted from the app's own palette once onCreate
+  runs (see AttakyTheme.applyWindow), but the launch window is drawn by the
+  system before that: the preview window, and on Android 12+ the splash screen
+  itself. With only the light theme defined, a dark phone opened the app on a
+  white flash with the launcher icon on it — this file is that window in the
+  dark palette, and it carries no logo: the wide wordmark cannot be squeezed
+  into a splash icon without looking mangled, so in the dark the first splash is
+  the page colour alone and the app's own splash is the one that shows the
+  wordmark, already in the place it animates from.
+-->
+<resources>
+    <style name="Base.Theme.AttakyFlasher" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/attaky_bg_dark</item>
+        <item name="android:colorBackground">@color/attaky_bg_dark</item>
+        <item name="android:statusBarColor">@color/attaky_bg_dark</item>
+        <item name="android:navigationBarColor">@color/attaky_bg_dark</item>
+        <item name="android:windowDisablePreview">true</item>
+        <!-- A near-black page and no icon: splash one is the colour only, so
+             the logo appears once, on the app's own transition splash. -->
+        <item name="android:windowSplashScreenBackground">@color/attaky_bg_dark</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_none</item>
+        <item name="colorAccent">@color/attaky_red_dark</item>
+    </style>
+</resources>

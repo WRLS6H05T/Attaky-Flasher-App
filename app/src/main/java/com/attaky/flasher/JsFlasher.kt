@@ -104,6 +104,7 @@ class JsFlasher(
             host = object : SerialBridge.Host {
                 override fun openNativeFlasher() = Unit
                 override fun openStore() = Unit
+                override fun openMenu() = Unit
             },
         )
 
@@ -158,6 +159,18 @@ class JsFlasher(
             .put("verify", verify)
             .toString()
         whenReady { evaluate("window.__attakyEngine&&window.__attakyEngine.flash(${quote(request)})") }
+    }
+
+    /**
+     * Stop a write that is in progress.
+     *
+     * esptool-js has no cancel of its own: the page closes the port, which fails
+     * the command in flight, so the write stops at the block boundary and the
+     * deck is left as it was at that point. The user is warned about that before
+     * this is called (see [NativeFlasher.leave]).
+     */
+    fun abort() {
+        evaluate("window.__attakyEngine&&window.__attakyEngine.abort()")
     }
 
     /** Drop the session without writing anything (used by DISCONNECT and teardown). */

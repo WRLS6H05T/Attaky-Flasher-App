@@ -1,12 +1,14 @@
 package com.attaky.flasher
 
 import android.content.SharedPreferences
+import android.graphics.BitmapFactory
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -35,17 +37,16 @@ class NativeFlasher(
     private val service: UsbSerialService,
     private val downloads: FirmwareDownloads,
     private val prefs: SharedPreferences,
+    private val settings: AppSettings,
     private val root: View,
-    private val onExit: () -> Unit,
-    private val onOpenStore: () -> Unit,
+    private val onMenu: () -> Unit,
 ) : UsbSerialService.Listener {
 
     private val io = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "attaky-native-flash").apply { isDaemon = true }
     }
 
-    private val btnBack: View = root.findViewById(R.id.btnBack)
-    private val btnStore: View = root.findViewById(R.id.btnStore)
+    private val btnMenu: View = root.findViewById(R.id.btnMenu)
     private val btnConnect: Button = root.findViewById(R.id.btnConnect)
     private val btnRescan: Button = root.findViewById(R.id.btnRescan)
     private val connPill: TextView = root.findViewById(R.id.connPill)
@@ -70,6 +71,18 @@ class NativeFlasher(
 
     @Volatile
     private var busy = false
+
+    /** True while an image is actually being written to the deck. */
+    @Volatile
+    private var flashing = false
+
+    /** How far the running write has got, for the warnings. */
+    @Volatile
+    private var flashPercent = 0
+
+    /** Set once the screen is being torn down; late engine callbacks are dropped. */
+    @Volatile
+    private var released = false
 
     /** The store's flasher, running off-screen (see [JsFlasher]). */
     private var engine: JsFlasher? = null
@@ -103,8 +116,7 @@ class NativeFlasher(
             ).also { service.listener = it.bridge }
         }
 
-        btnBack.setOnClickListener { onExit() }
-        btnStore.setOnClickListener { onOpenStore() }
+        btnMenu.setOnClickListener { leave(onMenu) }
         advancedToggle.setOnClickListener { toggleAdvanced() }
         btnConnect.setOnClickListener { onConnectClicked() }
         btnRescan.setOnClickListener { refreshDeckStatus(logLine = true) }
@@ -118,12 +130,24 @@ class NativeFlasher(
 
         renderFirmware()
         updateConnectedUi()
-        log("Ready. Pick a downloaded image, or connect the deck.")
+        log("Ready. Pick a downloaded image, or connect the core.")
         refreshDeckStatus(logLine = false)
+        applyTheme()
     }
+
+    /** Repaint this screen in the current palette; rows are rebuilt often. */
+    private fun applyTheme() {
+        AttakyTheme.apply(root, activity, settings)
+    }
+
+    /** A confirmation that matches the theme it opens over. */
+    private fun dialog(): AlertDialog.Builder =
+        AttakyTheme.dialog(activity, AttakyTheme.palette(activity, settings))
 
     /** Persist the advanced options and release the port. */
     fun stop() {
+        released = true
+        flashing = false
         runCatching {
             prefs.edit()
                 .putInt(KEY_BAUD, baudFromPrefs())
@@ -145,15 +169,46 @@ class NativeFlasher(
     /** True when the store has already put at least one image on the phone. */
     fun hasDownloadedFirmware(): Boolean = downloads.entries().isNotEmpty()
 
+    /**
+     * Leave this screen — but never out from under a write.
+     *
+     * A flash is a minute of unbroken USB traffic: closing the port in the middle
+     * of it can leave the deck with half an image on it. So while one is running
+     * this asks first, and "Stop and leave" aborts the write (the engine closes
+     * the port, which fails the esptool call in flight) before leaving.
+     */
+    fun leave(then: () -> Unit) {
+        if (!flashing) {
+            then()
+            return
+        }
+        dialog()
+            .setTitle("Flash in progress")
+            .setMessage(
+                "The core is being written (${flashPercent}%).\n\n" +
+                    "Leaving now stops the write and can leave the core half-flashed, " +
+                    "so it may not boot until it is flashed again.",
+            )
+            .setNegativeButton("Keep flashing", null)
+            .setPositiveButton("Stop and leave") { _, _ ->
+                log("Stopping the flash at $flashPercent%…")
+                engine?.abort()
+                flashing = false
+                toast("Flash stopped.")
+                then()
+            }
+            .show()
+    }
+
     // ------------------------------------------------------------------ deck
 
     private fun refreshDeckStatus(logLine: Boolean) {
         val ports = probePorts()
         if (ports.isEmpty()) {
-            connPill.text = if (connected) "connected" else "no deck found"
-            if (logLine) log("No USB serial device attached. Plug the deck in over USB.")
+            connPill.text = if (connected) "connected" else "no core found"
+            if (logLine) log("No USB serial device attached. Plug the core in over USB.")
         } else {
-            connPill.text = if (connected) "connected" else "deck found"
+            connPill.text = if (connected) "connected" else "core found"
             if (logLine || !connected) {
                 log("Found ${ports.size} USB serial port(s): ${ports.first().name}")
             }
@@ -188,7 +243,7 @@ class NativeFlasher(
         }
         val ports = probePorts()
         if (ports.isEmpty()) {
-            toast("No deck found. Plug it in over USB.")
+            toast("No core found. Plug it in over USB.")
             log("Connect failed: no USB serial device attached.")
             return
         }
@@ -227,7 +282,7 @@ class NativeFlasher(
         updateConnectedUi()
         chipInfo.visibility = View.GONE
         log("Could not connect: $message")
-        toast("Could not connect to the deck.")
+        toast("Could not connect to the core.")
         runCatching { service.close() }
     }
 
@@ -269,12 +324,14 @@ class NativeFlasher(
     }
 
     override fun onDisconnected(reason: String) {
+        // A write cannot survive the port going away; stop claiming otherwise.
+        flashing = false
         activity.runOnUiThread {
             if (connected) {
                 connected = false
                 updateConnectedUi()
                 chipInfo.visibility = View.GONE
-                log("The deck was disconnected: $reason")
+                log("The core was disconnected: $reason")
             }
         }
     }
@@ -290,6 +347,16 @@ class NativeFlasher(
         val inflater = LayoutInflater.from(activity)
         for (entry in entries) {
             val row = inflater.inflate(R.layout.item_firmware, firmwareList, false)
+            // The app icon saved with the image; the Attaky mark when the store
+            // page had none (or it could not be fetched).
+            val icon = row.findViewById<ImageView>(R.id.fwIcon)
+            val artwork = downloads.iconFile(entry)
+                ?.let { file -> BitmapFactory.decodeFile(file.absolutePath) }
+            if (artwork != null) {
+                icon.setImageBitmap(artwork)
+            } else {
+                icon.setImageResource(R.drawable.ic_launcher_foreground)
+            }
             row.findViewById<TextView>(R.id.fwName).text = entry.name
             row.findViewById<TextView>(R.id.fwMeta).text = buildString {
                 append(humanSize(entry.size))
@@ -300,17 +367,23 @@ class NativeFlasher(
             row.findViewById<View>(R.id.fwDelete).setOnClickListener { confirmDelete(entry.name) }
             firmwareList.addView(row)
         }
+        // Rows are new views every time, so they are painted after they are built.
+        applyTheme()
     }
 
     private fun confirmFlashDownloaded(entry: FirmwareDownloads.Entry) {
         if (busy) return
         if (!connected) {
-            toast("Connect the deck first.")
+            toast("Connect the core first.")
             return
         }
-        AlertDialog.Builder(activity)
-            .setTitle(entry.name)
-            .setMessage("Write ${humanSize(entry.size)} to the deck at 0x${offsetOf(entry).toString(16)}?")
+        dialog()
+            .setTitle("Flash ${entry.name}?")
+            .setMessage(
+                "This erases the core and writes ${humanSize(entry.size)} at " +
+                    "0x${offsetOf(entry).toString(16)}.\n\n" +
+                    "Do not unplug the core or leave this screen until it finishes.",
+            )
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Flash") { _, _ -> flashDownloaded(entry) }
             .show()
@@ -332,7 +405,7 @@ class NativeFlasher(
 
     private fun confirmDelete(name: String) {
         if (busy) return
-        AlertDialog.Builder(activity)
+        dialog()
             .setTitle("Delete $name?")
             .setMessage("Remove this image from the phone.")
             .setNegativeButton("Cancel", null)
@@ -391,6 +464,9 @@ class NativeFlasher(
                 }
                 return@runIo
             }
+            // The deck is touched from here on, so the exit warnings apply.
+            flashing = true
+            flashPercent = 0
             engine.flash(
                 offset = image.offset,
                 bytes = image.bytes,
@@ -401,6 +477,8 @@ class NativeFlasher(
     }
 
     private fun onEngineFlashDone(ok: Boolean, message: String) {
+        if (released) return
+        flashing = false
         activity.runOnUiThread {
             setBusy(false)
             if (ok) {
@@ -409,7 +487,7 @@ class NativeFlasher(
             }
             progressBox.visibility = View.GONE
             if (ok) {
-                log("Done. The deck is rebooting.")
+                log("Done. The core is rebooting.")
                 showFlashDone()
             } else {
                 log("Flash failed: $message")
@@ -425,7 +503,7 @@ class NativeFlasher(
     }
 
     private fun showFlashDone() {
-        AlertDialog.Builder(activity)
+        dialog()
             .setTitle("Flash complete")
             .setMessage("Firmware written successfully.")
             .setPositiveButton("OK") { _, _ -> renderFirmware() }
@@ -433,6 +511,8 @@ class NativeFlasher(
     }
 
     private fun onProgress(percent: Int) {
+        if (released) return
+        flashPercent = percent
         activity.runOnUiThread {
             progressBar.progress = percent
             progressText.text = "Writing — $percent%"
@@ -457,7 +537,7 @@ class NativeFlasher(
         btnConnect.text = if (connected) "DISCONNECT" else "CONNECT"
         connPill.text = when {
             connected -> "connected"
-            probePorts().isNotEmpty() -> "deck found"
+            probePorts().isNotEmpty() -> "core found"
             else -> "not connected"
         }
     }

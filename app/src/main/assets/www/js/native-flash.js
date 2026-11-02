@@ -43,6 +43,9 @@
     loader: null,
     transport: null,
     port: null,
+    // Set by abort(): the write in flight failed because it was stopped, not
+    // because the deck or the image is broken.
+    aborted: false,
   };
 
   // --------------------------------------------------------------- byte helpers
@@ -263,14 +266,14 @@
         );
       })
       .then(function () {
-        out.log("Resetting the deck into the new firmware…");
+        out.log("Resetting the core into the new firmware…");
         return pulse();
       })
       .then(function () {
         return sleep(600);
       })
       .then(function () {
-        out.log("The deck has been reset.");
+        out.log("The core has been reset.");
       });
   }
 
@@ -332,7 +335,8 @@
    * either way.
    */
   function flash(options) {
-    if (!state.loader) return Promise.reject(new Error("Connect the deck first."));
+    if (!state.loader) return Promise.reject(new Error("Connect the core first."));
+    state.aborted = false;
     var opts = options || {};
     var image = readImage();
     var offset = opts.offset || 0;
@@ -378,8 +382,12 @@
           out.done(true, where, "");
         },
         function (error) {
-          var message = describe(error);
-          out.log(message);
+          // A stopped write fails with whatever the closed port throws; say what
+          // actually happened instead of leaking that message.
+          var message = state.aborted
+            ? "Stopped before it finished — the core may be half-written."
+            : describe(error);
+          if (!state.aborted) out.log(message);
           out.done(false, where, message);
         },
       );
@@ -421,6 +429,13 @@
           return closePort();
         });
       });
+    },
+
+    /** Stop the write in flight by closing the port under esptool. */
+    abort: function () {
+      state.aborted = true;
+      out.log("Stopping…");
+      return closePort();
     },
 
     disconnect: function () {

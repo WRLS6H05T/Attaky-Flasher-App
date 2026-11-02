@@ -5,6 +5,10 @@
     <!-- The flasher page is the app; it downloads firmware over HTTP(S). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- The deck's web server is found on the phone's own WiFi network. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
     <!-- Required on API 21–28 to save firmware .bin files to Downloads. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"

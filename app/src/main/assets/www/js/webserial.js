@@ -394,7 +394,7 @@
     if (!ports.length) {
       return Promise.reject(
         new DOMException(
-          "No USB serial device found. Plug the deck in with a data cable and allow USB access.",
+          "No USB serial device found. Plug the core in with a data cable and allow USB access.",
           "NotFoundError",
         ),
       );

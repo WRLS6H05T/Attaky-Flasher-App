@@ -2,58 +2,42 @@
 <!--
   The native offline flasher. Reached from the boot chooser's "Downloaded
   Firmware" tile and from the store's floating escape button. Everything here is
-  local: the deck is driven over USB and firmware comes from the images the
-  store already saved on this device. Nothing here needs the network except the
-  Store link.
+  local: the core is driven over USB and firmware comes from the images the
+  store already saved on this device. Nothing here needs the network at all: the
+  corner button goes back to the menu, where the store is a tile.
+
+  The `android:tag="attaky:..."` values tell AttakyTheme what each part is, so
+  the screen repaints in either palette and in the user's chosen text colours.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/flasherRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/attaky_bg"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:tag="attaky:bg">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/attaky_surface"
-        android:gravity="center_vertical"
+        android:gravity="end|center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="8dp">
+        android:paddingStart="20dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="4dp">
 
-        <TextView
-            android:id="@+id/btnBack"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:clickable="true"
-            android:focusable="true"
-            android:fontFamily="@font/switzer_medium"
-            android:paddingStart="10dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="6dp"
-            android:text="←"
-            android:textColor="@color/attaky_ink"
-            android:textSize="22sp" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/jetbrains_mono_semibold"
-            android:letterSpacing="0.16"
-            android:text="FLASHER"
-            android:textColor="@color/attaky_ink"
-            android:textSize="13sp" />
-
+        <!--
+          The header is the button alone: no arrow and no title, so the corner it
+          occupies is the same one the menu's SETTINGS button sits in, in the same
+          box, and nothing moves when this screen opens over the menu.
+        -->
         <Button
-            android:id="@+id/btnStore"
+            android:id="@+id/btnMenu"
             style="@style/AttakyButton"
-            android:text="FIRMWARE STORE" />
+            android:gravity="center"
+            android:minWidth="112dp"
+            android:tag="attaky:outline"
+            android:text="@string/menu_title" />
     </LinearLayout>
 
     <ScrollView
@@ -74,7 +58,9 @@
             android:paddingBottom="24dp">
 
             <!-- Deck -->
-            <LinearLayout style="@style/AttakyCard">
+            <LinearLayout
+                style="@style/AttakyCard"
+                android:tag="attaky:card">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -86,22 +72,24 @@
                         style="@style/AttakySectionLabel"
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:text="Deck" />
+                        android:tag="attaky:muted"
+                        android:text="Core" />
 
                     <TextView
                         android:id="@+id/connPill"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/jetbrains_mono_regular"
+                        android:tag="attaky:muted"
                         android:text="not connected"
-                        android:textColor="@color/attaky_muted"
                         android:textSize="11sp" />
                 </LinearLayout>
 
                 <TextView
+                    style="@style/AttakyBody"
                     android:layout_marginTop="8dp"
-                    android:text="Plug the Attaky deck into USB, then connect to read the chip."
-                    style="@style/AttakyBody" />
+                    android:tag="attaky:muted"
+                    android:text="Plug the Attaky core into USB, then connect to read the chip." />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -112,12 +100,14 @@
                     <Button
                         android:id="@+id/btnConnect"
                         style="@style/AttakyPrimaryButton"
+                        android:tag="attaky:primary"
                         android:text="CONNECT" />
 
                     <Button
                         android:id="@+id/btnRescan"
                         style="@style/AttakyButton"
                         android:layout_marginStart="8dp"
+                        android:tag="attaky:outline"
                         android:text="RESCAN" />
                 </LinearLayout>
 
@@ -125,6 +115,7 @@
                     android:id="@+id/chipInfo"
                     style="@style/AttakyMono"
                     android:layout_marginTop="12dp"
+                    android:tag="attaky:ink"
                     android:visibility="gone" />
             </LinearLayout>
 
@@ -132,6 +123,7 @@
             <LinearLayout
                 android:id="@+id/progressBox"
                 style="@style/AttakyCard"
+                android:tag="attaky:card"
                 android:visibility="gone">
 
                 <ProgressBar
@@ -139,24 +131,31 @@
                     style="?android:attr/progressBarStyleHorizontal"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:max="100" />
+                    android:max="100"
+                    android:tag="attaky:progress" />
 
                 <TextView
                     android:id="@+id/progressText"
                     style="@style/AttakyBody"
-                    android:layout_marginTop="8dp" />
+                    android:layout_marginTop="8dp"
+                    android:tag="attaky:muted" />
             </LinearLayout>
 
             <!-- Firmware already on the phone -->
-            <LinearLayout style="@style/AttakyCard">
+            <LinearLayout
+                style="@style/AttakyCard"
+                android:tag="attaky:card">
 
                 <TextView
                     style="@style/AttakySectionLabel"
+                    android:layout_width="match_parent"
+                    android:tag="attaky:muted"
                     android:text="Downloaded firmware" />
 
                 <TextView
                     style="@style/AttakyBody"
                     android:layout_marginTop="6dp"
+                    android:tag="attaky:muted"
                     android:text="Images the store saved on this device. Flash them with no network." />
 
                 <LinearLayout
@@ -170,12 +169,15 @@
                     android:id="@+id/firmwareEmpty"
                     style="@style/AttakyBody"
                     android:layout_marginTop="10dp"
+                    android:tag="attaky:muted"
                     android:text="No downloaded firmware."
                     android:visibility="gone" />
             </LinearLayout>
 
             <!-- Advanced -->
-            <LinearLayout style="@style/AttakyCard">
+            <LinearLayout
+                style="@style/AttakyCard"
+                android:tag="attaky:card">
 
                 <LinearLayout
                     android:id="@+id/advancedToggle"
@@ -191,6 +193,7 @@
                         style="@style/AttakySectionLabel"
                         android:layout_width="0dp"
                         android:layout_weight="1"
+                        android:tag="attaky:muted"
                         android:text="Advanced" />
 
                     <TextView
@@ -198,8 +201,8 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/switzer_medium"
+                        android:tag="attaky:muted"
                         android:text="▾"
-                        android:textColor="@color/attaky_muted"
                         android:textSize="14sp" />
                 </LinearLayout>
 
@@ -213,6 +216,7 @@
                     <TextView
                         style="@style/AttakyBody"
                         android:layout_marginTop="12dp"
+                        android:tag="attaky:muted"
                         android:text="Baud rate" />
 
                     <EditText
@@ -220,7 +224,8 @@
                         style="@style/AttakyInput"
                         android:layout_marginTop="6dp"
                         android:inputType="number"
-                        android:maxLength="7" />
+                        android:maxLength="7"
+                        android:tag="attaky:outline" />
 
                     <CheckBox
                         android:id="@+id/checkVerify"
@@ -228,8 +233,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
                         android:fontFamily="@font/switzer_regular"
+                        android:tag="attaky:check"
                         android:text="Verify the image after writing"
-                        android:textColor="@color/attaky_ink"
                         android:textSize="13sp" />
 
                     <CheckBox
@@ -238,23 +243,28 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:fontFamily="@font/switzer_regular"
+                        android:tag="attaky:check"
                         android:text="Compress while writing"
-                        android:textColor="@color/attaky_ink"
                         android:textSize="13sp" />
                 </LinearLayout>
             </LinearLayout>
 
             <!-- Log -->
-            <LinearLayout style="@style/AttakyCard">
+            <LinearLayout
+                style="@style/AttakyCard"
+                android:tag="attaky:card">
 
                 <TextView
                     style="@style/AttakySectionLabel"
+                    android:layout_width="match_parent"
+                    android:tag="attaky:muted"
                     android:text="Log" />
 
                 <TextView
                     android:id="@+id/console"
                     style="@style/AttakyMono"
                     android:layout_marginTop="8dp"
+                    android:tag="attaky:ink"
                     android:textIsSelectable="true" />
             </LinearLayout>
 
@@ -265,7 +275,7 @@
                 android:layout_marginTop="16dp"
                 android:fontFamily="@font/jetbrains_mono_regular"
                 android:letterSpacing="0.1"
-                android:textColor="@color/attaky_muted"
+                android:tag="attaky:muted"
                 android:textSize="11sp" />
         </LinearLayout>
     </ScrollView>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Attaky Flasher</string>
-    <string name="usb_permission_title">Allow Attaky Flasher to access the deck?</string>
+    <string name="usb_permission_title">Allow Attaky Flasher to access the core?</string>
 
     <!-- Brand lockup. The wordmark itself comes from the store's own artwork. -->
     <string name="attaky_name" translatable="false">ATTAKY</string>
@@ -16,6 +16,65 @@
     <string name="choice_bundled_title">DOWNLOADED FIRMWARE</string>
     <string name="choice_bundled_sub">Flash images already on this device. Works offline.</string>
 
+    <!-- Menu: send firmware to the core's SD card over WiFi. -->
+    <string name="choice_wifi_title">LAUNCHER WEB UI</string>
+    <string name="choice_wifi_sub">Find your core on the network and send bins to the SD card. No cable.</string>
+    <string name="choice_wifi_found">Core found at %1$s. Send bins to its SD card, or update it over WiFi.</string>
+
+    <!-- Core over WiFi: the core's own web server, its card and its login. -->
+    <string name="wifi_title" translatable="false">LAUNCHER WEB UI</string>
+    <string name="wifi_scanning">Looking for the core on your network…</string>
+    <string name="wifi_scan_progress">Checked %1$d of %2$d addresses…</string>
+    <string name="wifi_scan_again">SCAN AGAIN</string>
+    <string name="wifi_scan_none">No core answered. On the core open MENU → Start Web User Interface and leave it on that screen, with this phone on the same network.</string>
+    <string name="wifi_scan_none_at">Nothing answered on %1$s or the core\'s hotspot address. Check that the core is on the WebUI screen and on this same network, or type the address it shows below.</string>
+    <string name="wifi_found">Core found at %1$s.</string>
+    <string name="wifi_deck_label">Core on your network</string>
+    <string name="wifi_deck_version">Launcher %1$s</string>
+    <string name="wifi_deck_sd">%1$s · SD %2$s free of %3$s</string>
+    <string name="wifi_deck_no_sd">The core reports no SD card. Insert one and scan again.</string>
+    <string name="wifi_deck_answered">Core answered at %1$s. Logging in…</string>
+    <string name="wifi_login_failed">The core answered at %1$s but refused the web login. Type the user and password it shows on its own screen.</string>
+    <string name="wifi_login_label">Core address and web login</string>
+    <string name="wifi_user_hint">User</string>
+    <string name="wifi_pass_hint">Password</string>
+    <string name="wifi_address_hint">Core address, e.g. 192.168.4.1</string>
+    <string name="wifi_connect">CONNECT</string>
+    <string name="wifi_connecting">Trying %1$s…</string>
+    <string name="wifi_address_needed">Type the address the core shows on its screen first.</string>
+    <string name="wifi_address_none">Nothing answered at %1$s. The core shows its own address on the WebUI screen — check it matches, and that the phone is on the same network.</string>
+    <string name="wifi_firmware_label">Firmware on this phone</string>
+    <string name="wifi_empty">Nothing downloaded yet. Grab firmware from the store — the merged image lands here ready to send.</string>
+    <string name="wifi_bin_merged">SD card image</string>
+    <string name="wifi_send">+</string>
+    <string name="wifi_send_desc">Send to the core\'s SD card</string>
+    <string name="wifi_sent">ON THE CORE\'S SD CARD</string>
+    <string name="wifi_sent_toast">%1$s is on the core\'s SD card.</string>
+    <string name="wifi_failed">Failed: %1$s</string>
+    <string name="wifi_card_refused">The core\'s card refused the write on all %1$d tries. The card, not the app, is the flaky part here — try again, or reseat it in the core.</string>
+    <string name="wifi_need_deck">Find the core first.</string>
+    <string name="wifi_file_gone">That file is gone.</string>
+    <string name="wifi_ota">OTA</string>
+    <string name="wifi_ota_desc">Update the core over WiFi</string>
+    <string name="wifi_ota_done">CORE UPDATED</string>
+    <string name="wifi_ota_title">Update the core over WiFi?</string>
+    <string name="wifi_ota_message">The core writes %1$s into a spare app slot and restarts into it. Its SD card and downloads are left alone.\n\nDo not unplug the core or close the app until it says the update finished.</string>
+    <string name="wifi_ota_start">Update</string>
+    <string name="wifi_ota_cancel">Cancel</string>
+    <string name="wifi_ota_ok">%1$s is on the core. It is restarting into the new firmware.</string>
+    <string name="wifi_ota_no_app">%1$s holds no app image, so there is nothing for the core to boot.</string>
+    <string name="wifi_help">On the core: MENU → Start Web User Interface. It shows an address on screen; this screen finds that core and posts the image to the card\'s root, where the core\'s SD flasher reads it. Tap OTA to install the image straight into the core\'s app slot over the same connection, for when the card is not to hand. If the scan misses the core, type the address it shows into Core address and tap CONNECT.</string>
+    <string name="wifi_leave_title">Still sending</string>
+    <string name="wifi_leave_message">An image is half-way to the core\'s card. Leaving now aborts the transfer and the core discards the partial file.</string>
+    <string name="wifi_leave_stay">Keep sending</string>
+    <string name="wifi_leave_go">Leave anyway</string>
+
+    <!-- The flasher header's corner button: back to the boot menu. -->
+    <string name="menu_title" translatable="false">MENU</string>
+
+    <!-- Native flasher: the icon saved beside each downloaded image. -->
+    <string name="firmware_icon">App icon</string>
+
     <!-- Native flasher: empty downloaded list. -->
     <string name="no_firmware_title">No downloaded firmware</string>
     <string name="no_firmware_message">Download firmware from the store first. A merged download lands in “Downloaded firmware” ready to flash.</string>
@@ -29,9 +88,38 @@
     <string name="serial_send">SEND</string>
     <string name="serial_clear">CLEAR</string>
 
+
     <!-- Firmware downloads from the store, kept on the phone for offline flashing. -->
     <string name="download_started">Saving %1$s for offline flashing…</string>
     <string name="download_saved">Saved %1$s — open “Downloaded Firmware” to flash it offline.</string>
     <string name="download_saved_merged">Saved %1$s to %2$s on this device — it is ready in “Downloaded Firmware”.</string>
     <string name="download_failed">Download failed: %1$s</string>
+
+    <!-- Settings: reached from the main page, changes only the native screens. -->
+    <string name="settings_title" translatable="false">SETTINGS</string>
+    <string name="settings_open">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_sub">Dark switches the page, the cards and the logo to the dark artwork.</string>
+    <string name="settings_light">LIGHT</string>
+    <string name="settings_dark">DARK</string>
+    <string name="settings_fullscreen">Full screen</string>
+    <string name="settings_fullscreen_sub">Hide the status and navigation bars so the flasher owns the whole screen. Swipe from the edge to bring them back.</string>
+    <string name="settings_fullscreen_toggle">Hide the system bars</string>
+    <string name="settings_text_size">Text size</string>
+    <string name="settings_text_size_sub">Scales every native screen: this page, the menu and the flasher.</string>
+    <string name="settings_text_preview">Sample text · 128 MB · 0x00000000</string>
+    <string name="settings_text_color">Text colour</string>
+    <string name="settings_text_color_sub">Overrides the two text tones on the menu and the flasher. The store pages keep their own colours.</string>
+    <string name="settings_text_primary">Headings and values</string>
+    <string name="settings_text_secondary">Labels and small print</string>
+    <string name="settings_color_auto">Automatic</string>
+    <string name="settings_color_white">White</string>
+    <string name="settings_color_ink">Ink</string>
+    <string name="settings_color_red">Brand red</string>
+    <string name="settings_color_amber">Amber</string>
+    <string name="settings_color_green">Green</string>
+    <string name="settings_color_blue">Blue</string>
+    <string name="settings_color_violet">Violet</string>
+    <string name="settings_reset">RESET TO DEFAULTS</string>
 </resources>

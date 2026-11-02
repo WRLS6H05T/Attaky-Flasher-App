@@ -13,7 +13,9 @@ import org.json.JSONArray
  * The ESP serial console on the main page.
  *
  * A plain serial terminal for whatever ESP board is plugged in: open the port and
- * the deck's boot log streams into the box, and a typed line is sent back. It is
+ * the core's boot log streams into the box, and a typed line is sent back. Every
+ * chunk is followed by its bytes as hex (RX) and so is every line this side sends
+ * (TX), so a button press on the board shows up as codes, not just as text. It is
  * deliberately not the flasher — it never resets the chip, never speaks the ROM
  * protocol, and holds the port only while the main page is on screen, so opening
  * the flasher or the store hands the deck straight back.
@@ -31,6 +33,7 @@ class SerialMonitor(
 ) : UsbSerialService.Listener {
 
     private val card: View = root.findViewById(R.id.serialCard)
+
     private val pill: TextView = root.findViewById(R.id.serialPill)
     private val status: TextView = root.findViewById(R.id.serialStatus)
     private val console: TextView = root.findViewById(R.id.serialOutput)
@@ -145,7 +148,13 @@ class SerialMonitor(
             while (reading) {
                 try {
                     val read = service.readRaw(buffer, READ_TIMEOUT_MS)
-                    if (read > 0) append(String(buffer, 0, read, Charsets.UTF_8))
+                    if (read > 0) {
+                        // The text as the chip meant it, then the same bytes in
+                        // hex: control codes and button presses are invisible in
+                        // the text, and this is a console, not a terminal.
+                        append(String(buffer, 0, read, Charsets.UTF_8))
+                        append("·RX " + hex(buffer, read) + "\n")
+                    }
                 } catch (t: Throwable) {
                     if (reading) {
                         reading = false
@@ -179,12 +188,28 @@ class SerialMonitor(
         }
         val line = input.text?.toString().orEmpty()
         try {
-            service.write((line + "\r\n").toByteArray(Charsets.UTF_8))
-            append("> $line\n")
+            val bytes = (line + "\r\n").toByteArray(Charsets.UTF_8)
+            service.write(bytes)
+            append("> $line\n·TX " + hex(bytes) + "\n")
             input.setText("")
         } catch (t: Throwable) {
             append("\n— send failed: ${t.message} —\n")
         }
+    }
+
+    /**
+     * The bytes as hex, sixteen to a line, so a button press shows exactly what
+     * crossed the wire — including the CR LF this console appends to a typed line.
+     */
+    private fun hex(bytes: ByteArray, length: Int = bytes.size): String {
+        if (length <= 0) return ""
+        val out = StringBuilder(length * 3)
+        for (i in 0 until length) {
+            if (i > 0) out.append(if (i % 16 == 0) "\n    " else " ")
+            val value = bytes[i].toInt() and 0xFF
+            out.append(HEX[value ushr 4]).append(HEX[value and 0x0F])
+        }
+        return out.toString()
     }
 
     private fun append(chunk: String) {
@@ -241,5 +266,6 @@ class SerialMonitor(
         const val DEFAULT_BAUD = 115200
         const val READ_TIMEOUT_MS = 200
         const val MAX_LOG = 16000
+        const val HEX = "0123456789ABCDEF"
     }
 }

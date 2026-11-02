@@ -10,9 +10,36 @@
         <item name="android:colorBackground">@color/attaky_surface</item>
         <item name="android:statusBarColor">@color/attaky_surface</item>
         <item name="android:navigationBarColor">@color/attaky_surface</item>
+        <!--
+          No preview window: the system would otherwise paint its own white
+          launch surface before the dark theme's splash, which reads as a flash
+          of white on every cold start.
+        -->
+        <item name="android:windowDisablePreview">true</item>
+        <!--
+          Android 12+ always draws its own launch splash before the app's first
+          frame, whatever the preview flag says. Only the colour is ours: the
+          wordmark is far too wide to be squeezed into the splash icon, so the
+          icon is left to the system and the app's own splash shows the logo at
+          its proper size a frame later. values-night clears the icon entirely.
+        -->
+        <item name="android:windowSplashScreenBackground">@color/attaky_boot_bg</item>
         <!-- The accent only reaches the sign-out dialog's buttons. -->
         <item name="colorAccent">@color/attaky_red</item>
     </style>
 
     <style name="Theme.AttakyFlasher" parent="Base.Theme.AttakyFlasher" />
+
+    <!--
+      Confirmations opened over the dark theme. Without this the flasher's
+      warnings would flash a white dialog over a near-black page; with a flat
+      colour as the window they painted a solid black slab, so the window is the
+      same outlined card the pages are made of.
+    -->
+    <style name="Theme.AttakyFlasher.Dialog.Dark" parent="Theme.AppCompat.Dialog.Alert">
+        <item name="colorAccent">@color/attaky_red_dark</item>
+        <item name="android:windowBackground">@drawable/bg_attaky_dialog_dark</item>
+        <item name="android:textColorPrimary">@color/attaky_ink_dark</item>
+        <item name="android:textColorSecondary">@color/attaky_muted_dark</item>
+    </style>
 </resources>

@@ -29,6 +29,7 @@ class SerialBridge(
     interface Host {
         fun openNativeFlasher()
         fun openStore()
+        fun openMenu()
     }
 
     interface SiteUrlStore {
@@ -205,6 +206,13 @@ class SerialBridge(
     @JavascriptInterface
     fun openNativeFlasher(): String {
         webView.post { host.openNativeFlasher() }
+        return "ok"
+    }
+
+    /** Leave whatever page is loaded — the store included — for the native menu. */
+    @JavascriptInterface
+    fun openMenu(): String {
+        webView.post { host.openMenu() }
         return "ok"
     }
 

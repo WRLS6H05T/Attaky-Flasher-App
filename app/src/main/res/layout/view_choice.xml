@@ -4,11 +4,14 @@
   images already on this device. The two cards mirror the firmware tiles on the
   store's own front page. The serial console underneath appears only while a USB
   serial device is attached.
+
+  The `android:tag="attaky:..."` values tell AttakyTheme what each part is, so
+  the screen repaints in either palette and in the user's chosen text colours.
 -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/attaky_bg"
+    android:tag="attaky:bg"
     android:fillViewport="true"
     android:scrollbars="none">
 
@@ -17,13 +20,36 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingStart="20dp"
-        android:paddingTop="28dp"
+        android:paddingTop="10dp"
         android:paddingEnd="20dp"
         android:paddingBottom="20dp">
+
+        <!--
+          Appearance settings: a real button in the top-right corner, so it reads
+          as part of the menu rather than small print. Theme, full screen, text
+          size, text colours. It is the same box as the flasher's MENU button
+          (same corner, same width), so switching screens does not move it.
+        -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSettings"
+                style="@style/AttakyButton"
+                android:contentDescription="@string/settings_open"
+                android:gravity="center"
+                android:minWidth="112dp"
+                android:tag="attaky:outline"
+                android:text="@string/settings_title" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
             android:gravity="center"
             android:orientation="vertical">
 
@@ -42,8 +68,8 @@
                 android:layout_marginTop="6dp"
                 android:fontFamily="@font/jetbrains_mono_regular"
                 android:letterSpacing="0.42"
+                android:tag="attaky:muted"
                 android:text="@string/attaky_flasher"
-                android:textColor="@color/attaky_muted"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -53,8 +79,8 @@
             android:layout_marginTop="24dp"
             android:fontFamily="@font/switzer_medium"
             android:gravity="center"
+            android:tag="attaky:muted"
             android:text="@string/choice_title"
-            android:textColor="@color/attaky_muted"
             android:textSize="14sp" />
 
         <LinearLayout
@@ -70,15 +96,16 @@
             android:paddingStart="18dp"
             android:paddingTop="16dp"
             android:paddingEnd="18dp"
-            android:paddingBottom="16dp">
+            android:paddingBottom="16dp"
+            android:tag="attaky:card">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/switzer_semibold"
                 android:letterSpacing="0.01"
+                android:tag="attaky:ink"
                 android:text="@string/choice_store_title"
-                android:textColor="@color/attaky_ink"
                 android:textSize="16sp" />
 
             <TextView
@@ -87,8 +114,8 @@
                 android:layout_marginTop="6dp"
                 android:fontFamily="@font/switzer_regular"
                 android:lineSpacingExtra="2dp"
+                android:tag="attaky:muted"
                 android:text="@string/choice_store_sub"
-                android:textColor="@color/attaky_muted"
                 android:textSize="13sp" />
         </LinearLayout>
 
@@ -105,15 +132,16 @@
             android:paddingStart="18dp"
             android:paddingTop="16dp"
             android:paddingEnd="18dp"
-            android:paddingBottom="16dp">
+            android:paddingBottom="16dp"
+            android:tag="attaky:card">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/switzer_semibold"
                 android:letterSpacing="0.01"
+                android:tag="attaky:ink"
                 android:text="@string/choice_bundled_title"
-                android:textColor="@color/attaky_ink"
                 android:textSize="16sp" />
 
             <TextView
@@ -122,20 +150,64 @@
                 android:layout_marginTop="6dp"
                 android:fontFamily="@font/switzer_regular"
                 android:lineSpacingExtra="2dp"
+                android:tag="attaky:muted"
                 android:text="@string/choice_bundled_sub"
-                android:textColor="@color/attaky_muted"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!--
+          Firmware onto the deck's SD card over the network, no cable. Hidden
+          until a deck answers on the network: the menu offers it only when it
+          can actually be used (see MainActivity.watchForDeck).
+        -->
+        <LinearLayout
+            android:id="@+id/tileWifi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_attaky_tile"
+            android:clickable="true"
+            android:elevation="1dp"
+            android:focusable="true"
+            android:orientation="vertical"
+            android:paddingStart="18dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="18dp"
+            android:paddingBottom="16dp"
+            android:tag="attaky:card"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/switzer_semibold"
+                android:letterSpacing="0.01"
+                android:tag="attaky:ink"
+                android:text="@string/choice_wifi_title"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/tileWifiSub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:fontFamily="@font/switzer_regular"
+                android:lineSpacingExtra="2dp"
+                android:tag="attaky:muted"
+                android:text="@string/choice_wifi_sub"
                 android:textSize="13sp" />
         </LinearLayout>
 
         <!--
           Serial console. Hidden until a USB serial device is attached; see
-          SerialMonitor. Sits under the two firmware tiles so the deck's own
+          SerialMonitor. Sits under the firmware tiles so the deck's own
           boot log is one tap away.
         -->
         <LinearLayout
             android:id="@+id/serialCard"
             style="@style/AttakyCard"
             android:layout_marginTop="12dp"
+            android:tag="attaky:card"
             android:visibility="gone">
 
             <LinearLayout
@@ -148,6 +220,7 @@
                     style="@style/AttakySectionLabel"
                     android:layout_width="0dp"
                     android:layout_weight="1"
+                    android:tag="attaky:muted"
                     android:text="@string/serial_title" />
 
                 <TextView
@@ -155,14 +228,15 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:fontFamily="@font/jetbrains_mono_regular"
-                    android:textColor="@color/attaky_muted"
+                    android:tag="attaky:muted"
                     android:textSize="11sp" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/serialStatus"
                 style="@style/AttakyBody"
-                android:layout_marginTop="6dp" />
+                android:layout_marginTop="6dp"
+                android:tag="attaky:muted" />
 
             <ScrollView
                 android:id="@+id/serialScroll"
@@ -172,11 +246,13 @@
                 android:background="@drawable/bg_attaky_tile"
                 android:fillViewport="true"
                 android:padding="10dp"
-                android:scrollbars="vertical">
+                android:scrollbars="vertical"
+                android:tag="attaky:well">
 
                 <TextView
                     android:id="@+id/serialOutput"
                     style="@style/AttakyMono"
+                    android:tag="attaky:ink"
                     android:textIsSelectable="true" />
             </ScrollView>
 
@@ -196,12 +272,14 @@
                     android:hint="@string/serial_hint"
                     android:imeOptions="actionSend"
                     android:inputType="textNoSuggestions"
-                    android:maxLines="1" />
+                    android:maxLines="1"
+                    android:tag="attaky:outline" />
 
                 <Button
                     android:id="@+id/serialSend"
                     style="@style/AttakyPrimaryButton"
                     android:layout_marginStart="8dp"
+                    android:tag="attaky:primary"
                     android:text="@string/serial_send" />
             </LinearLayout>
 
@@ -214,12 +292,14 @@
                 <Button
                     android:id="@+id/serialToggle"
                     style="@style/AttakyButton"
+                    android:tag="attaky:outline"
                     android:text="@string/serial_open" />
 
                 <Button
                     android:id="@+id/serialClear"
                     style="@style/AttakyButton"
                     android:layout_marginStart="8dp"
+                    android:tag="attaky:outline"
                     android:text="@string/serial_clear" />
             </LinearLayout>
         </LinearLayout>
@@ -244,7 +324,7 @@
                 android:layout_weight="1"
                 android:fontFamily="@font/jetbrains_mono_regular"
                 android:letterSpacing="0.1"
-                android:textColor="@color/attaky_muted"
+                android:tag="attaky:muted"
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>

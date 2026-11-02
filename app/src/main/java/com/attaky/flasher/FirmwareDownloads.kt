@@ -42,6 +42,12 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
         val size: Long,
         val offset: Long,
         val added: Long,
+        /** The store's firmware id (`/firmware/50/parts/…`), so store pages can
+         *  tell which firmwares are already on the phone. Empty when unknown. */
+        val firmwareId: String = "",
+        /** File name of the app icon saved beside the image, or null when the
+         *  store page had none. Kept on disk, so the list shows it offline. */
+        val icon: String? = null,
     )
 
     private val appContext: Context = context.applicationContext
@@ -79,6 +85,8 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
                     put("offset", entry.offset)
                     put("added", entry.added)
                     put("sourceUrl", entry.sourceUrl)
+                    put("firmwareId", entry.firmwareId)
+                    put("icon", entry.icon.orEmpty())
                 },
             )
         }
@@ -88,6 +96,8 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
     override fun delete(name: String): Boolean = synchronized(lock) {
         val file = fileFor(name) ?: return@synchronized false
         val removed = file.delete()
+        // The icon belongs to this image; leaving it behind would outlive it.
+        entries[name]?.icon?.let { icon -> File(dir, icon).delete() }
         entries.remove(name)
         writeIndex(entries)
         removed
@@ -97,6 +107,11 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
     fun entries(): List<Entry> = synchronized(lock) {
         refreshLocked()
         entries.values.sortedByDescending { it.added }
+    }
+
+    /** The saved app icon for [entry], or null when this image has none. */
+    fun iconFile(entry: Entry): File? = entry.icon?.let { name ->
+        File(dir, name).takeIf { it.isFile && it.length() > 0L }
     }
 
     // ------------------------------------------------------------------ downloads
@@ -156,6 +171,7 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
                         size = target.length(),
                         offset = FlashLayout.slotFor(name)?.offset ?: 0L,
                         added = System.currentTimeMillis(),
+                        firmwareId = firmwareIdOf(url),
                     )
                     writeIndex(entries)
                 }
@@ -198,7 +214,12 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
 
     private class MergedPart(val name: String, val url: String, val offset: Long?)
 
-    private class MergedRequest(val title: String, val parts: List<MergedPart>)
+    private class MergedRequest(
+        val title: String,
+        val id: String,
+        val icon: String?,
+        val parts: List<MergedPart>,
+    )
 
     private fun parseMerged(json: String): MergedRequest {
         val root = JSONObject(json)
@@ -217,7 +238,9 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
             parts.add(MergedPart(name, url, offset))
         }
         if (parts.isEmpty()) throw IllegalArgumentException("no parts")
-        return MergedRequest(root.optString("title"), parts)
+        val id = root.optString("id").ifEmpty { firmwareIdOf(parts.first().url) }
+        val icon = root.optString("icon").takeIf { it.isNotEmpty() }
+        return MergedRequest(root.optString("title"), id, icon, parts)
     }
 
     private class SavedImage(val name: String, val published: String?)
@@ -247,6 +270,10 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
             tmp.delete()
         }
 
+        // Fetched while the store is still reachable, and kept beside the image:
+        // the flasher's downloaded list shows it with no network at all.
+        val icon = saveIcon(request.icon, name)
+
         synchronized(lock) {
             refreshLocked()
             entries[name] = Entry(
@@ -255,6 +282,8 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
                 size = target.length(),
                 offset = image.offset,
                 added = System.currentTimeMillis(),
+                firmwareId = request.id,
+                icon = icon,
             )
             writeIndex(entries)
         }
@@ -262,6 +291,32 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
         // The flasher reads its own copy; this one is for the user to see in the
         // phone's Downloads folder (and to move onto an SD card, share, etc.).
         return SavedImage(name, publishToDownloads(name, image.bytes))
+    }
+
+    /**
+     * Keep the firmware's app icon next to its image as `<image>.icon.<ext>`.
+     *
+     * Best effort: an image without an icon still flashes, so a failed fetch
+     * only leaves the flasher's row with the Attaky mark instead.
+     */
+    private fun saveIcon(url: String?, imageName: String): String? {
+        if (url.isNullOrEmpty()) return null
+        return try {
+            val bytes = fetch(url)
+            if (bytes.isEmpty()) return null
+            val ext = url.substringBefore('?').substringAfterLast('.', "png").lowercase()
+                .takeIf { it in ICON_EXT } ?: "png"
+            val file = File(dir, "$imageName.icon.$ext")
+            FileOutputStream(file).use { it.write(bytes) }
+            if (iconFileFor(imageName) == null) {
+                file.delete()
+                return null
+            }
+            file.name
+        } catch (t: Throwable) {
+            Log.w(TAG, "could not save the icon for $imageName", t)
+            null
+        }
     }
 
     /**
@@ -361,8 +416,14 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
         val merged = LinkedHashMap<String, Entry>()
         index.forEach { (name, entry) ->
             val file = File(dir, name)
-            if (file.isFile) entries[name]?.let { /* keep */ }
-            if (file.isFile) merged[name] = entry.copy(size = file.length())
+            if (!file.isFile) return@forEach
+            // Downloads saved before the id was recorded still carry it in the
+            // part URL they came from.
+            val id = entry.firmwareId.ifEmpty { firmwareIdOf(entry.sourceUrl) }
+            // An icon saved on disk is found again after a restart, and one the
+            // index forgot is picked back up from the folder.
+            val icon = iconFileFor(name) ?: entry.icon
+            merged[name] = entry.copy(size = file.length(), firmwareId = id, icon = icon)
         }
 
         val files = dir.listFiles()
@@ -379,6 +440,7 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
                     size = file.length(),
                     offset = FlashLayout.slotFor(n)?.offset ?: 0L,
                     added = file.lastModified(),
+                    icon = iconFileFor(n),
                 )
             }
         }
@@ -386,6 +448,12 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
         entries = merged
         writeIndex(merged)
     }
+
+    /** `<image>.icon.png|webp|…` beside [imageName], if one was saved. */
+    private fun iconFileFor(imageName: String): String? = ICON_EXT.asSequence()
+        .map { File(dir, "$imageName.icon.$it") }
+        .firstOrNull { it.isFile && it.length() > 0L }
+        ?.name
 
     private fun readIndex(): LinkedHashMap<String, Entry> {
         val map = LinkedHashMap<String, Entry>()
@@ -402,6 +470,8 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
                     size = obj.optLong("size"),
                     offset = obj.optLong("offset"),
                     added = obj.optLong("added"),
+                    firmwareId = obj.optString("firmwareId"),
+                    icon = obj.optString("icon").takeIf { it.isNotEmpty() },
                 )
             }
         } catch (t: Throwable) {
@@ -422,6 +492,8 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
                         put("size", entry.size)
                         put("offset", entry.offset)
                         put("added", entry.added)
+                        put("firmwareId", entry.firmwareId)
+                        put("icon", entry.icon.orEmpty())
                     },
                 )
             }
@@ -447,10 +519,19 @@ class FirmwareDownloads(context: Context) : SerialBridge.FirmwareStore {
         /** Only these extensions are adopted when scanning the folder. */
         private val FIRMWARE_EXT = setOf("bin", "img", "zip")
 
+        /** Extensions accepted for a saved app icon, in order of preference. */
+        private val ICON_EXT = listOf("webp", "png", "jpg", "jpeg")
+
         fun looksLikeFirmware(name: String): Boolean {
             val ext = name.substringAfterLast('.', "").lowercase()
             return ext.isNotEmpty() && ext in FIRMWARE_EXT
         }
+
+        /** The store's firmware id from a part URL: `/firmware/50/parts/154/…`. */
+        private val FIRMWARE_ID_RE = Regex("/firmware/(\\d+)(?:/|$)")
+
+        fun firmwareIdOf(url: String): String =
+            FIRMWARE_ID_RE.find(url)?.groupValues?.get(1).orEmpty()
     }
 }
 

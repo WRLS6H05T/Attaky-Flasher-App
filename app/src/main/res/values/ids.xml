@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Keyed tag ids: the theme engine stores each TextView's designed text size under
+  attaky_base_text_px the first time it sees it, so changing the text-size slider
+  multiplies the design size instead of compounding on the last result.
+-->
+<resources>
+    <item name="attaky_base_text_px" type="id" />
+</resources>

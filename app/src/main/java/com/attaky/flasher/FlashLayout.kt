@@ -121,7 +121,7 @@ object FlashLayout {
         val base = sorted.first().offset
         val span = sorted.last().let { it.offset + it.bytes.size } - base
         require(span <= MAX_IMAGE) {
-            "The set spans $span bytes; that is larger than the deck's flash."
+            "The set spans $span bytes; that is larger than the core's flash."
         }
 
         val image = ByteArray(span.toInt()) { PAD }

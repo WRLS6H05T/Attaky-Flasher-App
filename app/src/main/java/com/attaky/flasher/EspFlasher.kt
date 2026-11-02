@@ -98,7 +98,7 @@ class EspFlasher(private val usb: UsbSerialService) {
      * restarting over and over.
      */
     fun connect(baudRate: Int, log: (String) -> Unit): ChipInfo {
-        log("Connecting to the deck at $baudRate baud…")
+        log("Connecting to the core at $baudRate baud…")
 
         // A deck already sitting in the ROM loader — left there by an earlier
         // attempt, or one flashed moments ago — answers without any reset, so
@@ -139,7 +139,7 @@ class EspFlasher(private val usb: UsbSerialService) {
         // Never leave the board parked in reset after a failed connect.
         runCatching { hardReset() }
         throw IOException(
-            "Could not sync with the deck. Tried ${order.size} reset styles; last said: " +
+            "Could not sync with the core. Tried ${order.size} reset styles; last said: " +
                 "${lastError ?: "no answer"}",
         )
     }
@@ -484,7 +484,7 @@ class EspFlasher(private val usb: UsbSerialService) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (true) {
             val remaining = (deadline - System.currentTimeMillis()).toInt()
-            if (remaining <= 0) throw IOException("Invalid response from the deck.")
+            if (remaining <= 0) throw IOException("Invalid response from the core.")
             val packet = readSlipPacket(remaining)
             if (packet.size < 8) continue
             if ((packet[0].toInt() and 0xff) != 1) continue
@@ -498,7 +498,7 @@ class EspFlasher(private val usb: UsbSerialService) {
                 throw UnsupportedCommandException()
             }
         }
-        throw IOException("Invalid response from the deck.")
+        throw IOException("Invalid response from the core.")
     }
 
     /** Read one SLIP-framed packet, skipping any noise before the opening 0xC0. */
@@ -541,13 +541,13 @@ class EspFlasher(private val usb: UsbSerialService) {
                 if (remaining <= 0) {
                     throw IOException(
                         when {
-                            packet != null -> "Timed out waiting for the deck."
+                            packet != null -> "Timed out waiting for the core."
                             // Open port, silent line: either the deck stopped
                             // answering or it left the bus entirely (a reset
                             // re-enumerates native USB). Those need different
                             // fixes, so they read differently here.
                             !usb.isDeviceAttached() ->
-                                "The deck left USB (it reset or was unplugged). Reconnect it, then tap CONNECT."
+                                "The core left USB (it reset or was unplugged). Reconnect it, then tap CONNECT."
                             else -> "No serial data received."
                         },
                     )
@@ -582,7 +582,7 @@ class EspFlasher(private val usb: UsbSerialService) {
                 sleep(60)
             }
         }
-        throw IOException(lastError?.message ?: "The deck did not answer the sync.")
+        throw IOException(lastError?.message ?: "The core did not answer the sync.")
     }
 
     /** Which reset dance the attached board understands. */

@@ -30,4 +30,33 @@
 
     <!-- White, because the launcher mark is the red monogram on white. -->
     <color name="attaky_launcher_background">#FFFFFFFF</color>
+
+    <!--
+      The dark theme. Same instrument-panel layout, near-black page: a cool
+      graphite that keeps the red readable, with the wordmark switched to the
+      light asset (attaky_logo_dark.png).
+    -->
+    <color name="attaky_bg_dark">#FF0D0D0E</color>
+    <color name="attaky_surface_dark">#FF17181A</color>
+    <color name="attaky_well_dark">#FF111214</color>
+    <color name="attaky_ink_dark">#FFF2F2F3</color>
+    <color name="attaky_muted_dark">#FF9EA0A6</color>
+    <color name="attaky_border_dark">#FF2A2B2F</color>
+    <color name="attaky_press_dark">#FF202124</color>
+    <!--
+      The site's own red, untinted: a lighter variant read as a different brand
+      colour on a near-black page, so both themes use the store's primary red
+      (#C72B2F) exactly.
+    -->
+    <color name="attaky_red_dark">#FFC72B2F</color>
+    <color name="attaky_red_press_dark">#FFA82327</color>
+
+    <!-- The text-colour swatches offered in Settings. -->
+    <color name="swatch_white">#FFFFFFFF</color>
+    <color name="swatch_ink">#FF141414</color>
+    <color name="swatch_red">#FFC72B2F</color>
+    <color name="swatch_amber">#FFD98324</color>
+    <color name="swatch_green">#FF2F9E58</color>
+    <color name="swatch_blue">#FF2D6CDF</color>
+    <color name="swatch_violet">#FF8B5CF6</color>
 </resources>

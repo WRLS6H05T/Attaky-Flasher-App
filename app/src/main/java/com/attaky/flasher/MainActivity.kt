@@ -9,6 +9,8 @@ import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -66,6 +68,12 @@ class MainActivity : AppCompatActivity() {
         /** The native offline flasher owns the screen. */
         FLASHER,
 
+        /** Appearance settings, a sub-screen of the menu. */
+        SETTINGS,
+
+        /** Firmware onto the deck's SD card over WiFi, a sub-screen of the menu. */
+        WIFI,
+
         /** The flasher page is live and the WebView owns the screen. */
         APP,
     }
@@ -74,6 +82,12 @@ class MainActivity : AppCompatActivity() {
         private const val TAG = "AttakyFlasher"
         private const val PREFS = "attaky_flasher"
         private const val KEY_SITE_URL = "site_url"
+
+        /** How often the menu looks for the deck while it is showing. */
+        private const val WATCH_INTERVAL_MS = 7_000L
+
+        /** The full subnet sweep runs at most this often; the address probe covers the ticks between. */
+        private const val SWEEP_INTERVAL_MS = 7_000L
 
         /** Bundled page. WebViewAssetLoader maps /assets/ to app/src/main/assets. */
         private const val LOCAL_PAGE =
@@ -97,31 +111,58 @@ class MainActivity : AppCompatActivity() {
         /** How long the splash logo takes to shrink into the main page's logo. */
         private const val MORPH_MS = 480L
 
-        /** Escape hatch on the store pages: leave the web view for the native
-         *  flasher, which runs its own ROM-bootloader engine offline. In the
-         *  store's own sticky header the native flasher takes the right-hand slot
-         *  and the site's menu toggle slides to the middle of the bar; both wear
-         *  the same shape and hairline border as the native STORE button. A header
-         *  without a menu toggle just falls back to the top-right corner. */
-        private const val STORE_ESCAPE_JS = """
+        /** A palette colour the store page's CSS understands. */
+        fun css(color: Int): String = String.format("#%06X", color and 0xFFFFFF)
+
+        /** The store pages' corner button: the same MENU the native screens carry,
+         *  in the same box and the same colours, so leaving the store is the same
+         *  gesture in the same place as leaving any other screen. In the store's
+         *  own sticky header it takes the right-hand slot and the site's menu
+         *  toggle slides to the middle of the bar; both wear the palette's fill,
+         *  hairline and ink. A header without a menu toggle falls back to the
+         *  top-right corner. */
+        fun storeEscapeJs(palette: Palette): String = """
             ;(function () {
+              // Keep the store's own mobile header — the three-bar menu — at every
+              // width. The site's navbar collapses to inline links from 992 px, so
+              // on a wide landscape screen the bars would disappear; pinning the
+              // menu button keeps the header the same in both orientations.
+              if (!document.getElementById('attaky-store-header')) {
+                var headerStyle = document.createElement('style');
+                headerStyle.id = 'attaky-store-header';
+                headerStyle.textContent =
+                  '.navbar-toggler{display:inline-flex!important;margin-left:auto;' +
+                  'align-items:center;justify-content:center}' +
+                  '@media (min-width:992px){' +
+                  '.navbar-expand-lg .navbar-collapse{display:none!important}' +
+                  '.navbar-expand-lg .navbar-collapse.show{display:flex!important;' +
+                  'flex-basis:100%;flex-direction:column;align-items:flex-start}' +
+                  '}';
+                (document.head || document.documentElement).appendChild(headerStyle);
+              }
+
               if (document.getElementById('attaky-store-escape')) return;
               var b = document.createElement('button');
               b.id = 'attaky-store-escape';
               b.type = 'button';
-              b.textContent = '${'\u26a1'} Native flasher';
-              b.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2147483647;' +
-                'background:#FFFFFF;color:#141414;border:1px solid #E5E5E5;border-radius:10px;' +
-                'padding:10px 16px;font:600 12px system-ui;text-transform:uppercase;' +
-                'letter-spacing:.05em;white-space:nowrap;';
+              b.textContent = 'MENU';
+              // The native MENU button, box for box: same corner, same width and
+              // height, same fill, hairline, ink and 12 px lettered capitals as
+              // the SETTINGS button on the menu and the MENU button on the
+              // flasher.
+              b.style.cssText = 'position:fixed;top:10px;right:20px;z-index:2147483647;' +
+                'box-sizing:border-box;display:inline-flex;align-items:center;' +
+                'justify-content:center;min-width:112px;height:40px;padding:0 16px;' +
+                'background:${css(palette.surface)};color:${css(palette.ink)};' +
+                'border:1px solid ${css(palette.border)};border-radius:10px;' +
+                'font:600 12px system-ui;text-transform:uppercase;letter-spacing:.05em;' +
+                'white-space:nowrap;';
               b.onclick = function () {
                 try {
-                  if (window.AttakyUSB && window.AttakyUSB.openNativeFlasher) {
-                    window.AttakyUSB.openNativeFlasher();
-                    return;
+                  if (window.AttakyUSB && window.AttakyUSB.openMenu) {
+                    window.AttakyUSB.openMenu();
                   }
                 } catch (e) {}
-                window.location.href = '$LOCAL_PAGE';
               };
               document.body.appendChild(b);
               try {
@@ -133,17 +174,17 @@ class MainActivity : AppCompatActivity() {
                   // border as the native STORE button: white, 1px #E5E5E5, 10px
                   // corners, ink bars, and the same height and side padding.
                   tog.style.boxSizing = 'border-box';
-                  tog.style.background = '#FFFFFF';
-                  tog.style.border = '1px solid #E5E5E5';
+                  tog.style.background = '${css(palette.surface)}';
+                  tog.style.border = '1px solid ${css(palette.border)}';
                   tog.style.borderRadius = '10px';
-                  tog.style.color = '#141414';
+                  tog.style.color = '${css(palette.ink)}';
                   tog.style.height = Math.round(bh) + 'px';
                   tog.style.padding = '0 16px';
                   tog.style.display = 'inline-flex';
                   tog.style.alignItems = 'center';
                   tog.style.justifyContent = 'center';
                   tb = tog.getBoundingClientRect();
-                  // The native flasher takes the right-hand slot of the bar ...
+                  // The MENU button takes the right-hand slot of the bar ...
                   b.style.top = Math.round(tb.top + (tb.height - bh) / 2) + 'px';
                   b.style.right = Math.round(window.innerWidth - tb.right) + 'px';
                   // ... and the store's menu button slides to the middle of the bar.
@@ -176,7 +217,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var assetLoader: WebViewAssetLoader
     private lateinit var downloads: FirmwareDownloads
 
+    /** Theme, text size, text colours and full screen, shared by every native screen. */
+    private lateinit var settings: AppSettings
+
     private val prefs by lazy { getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+
+    /** The colours the native screens are drawn in right now. */
+    private val palette: Palette get() = AttakyTheme.palette(this, settings)
 
     /** Where the boot sequence is; the WebView is only trusted with pages in
      *  [Stage.APP], so boot screens never get the flasher polyfill. */
@@ -204,6 +251,24 @@ class MainActivity : AppCompatActivity() {
 
     /** The ESP serial console on the main page, while that page is on screen. */
     private var serialMonitor: SerialMonitor? = null
+
+    /** The settings screen, while it is on screen. */
+    private var settingsScreen: SettingsScreen? = null
+
+    /** The WiFi transfer screen, while it is on screen. */
+    private var wifiScreen: WifiDeckScreen? = null
+
+    /** The quiet sweep that decides whether the Launcher Web UI tile belongs on the menu. */
+    private var menuWifi: DeckWifi? = null
+
+    /** True while the menu is still looking for the deck. */
+    private var watching = false
+
+    /** When the /24 sweep last ran, so it is not repeated on every tick. */
+    private var lastSweepAt = 0L
+
+    /** Runs the watch's next look a [WATCH_INTERVAL_MS] after the last one finished. */
+    private val watchHandler = Handler(Looper.getMainLooper())
 
     /** Where back lands when the native flasher closes. */
     private var flasherReturnStage = Stage.CHOICE
@@ -242,7 +307,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        settings = AppSettings(this)
+        // Paint the window before the first frame, so a dark theme never opens on
+        // a white flash, and restore full screen straight away.
+        AttakyTheme.applyWindow(this, palette, settings)
         setContentView(R.layout.activity_main)
+
+        // The page behind the boot screens: without this the dark theme opens on
+        // the layout's own white for a frame before the splash is inflated.
+        findViewById<View>(R.id.mainRoot)?.setBackgroundColor(palette.bg)
 
         bootHost = findViewById(R.id.bootHost)
 
@@ -276,6 +349,7 @@ class MainActivity : AppCompatActivity() {
             object : SerialBridge.Host {
                 override fun openNativeFlasher() = this@MainActivity.openNativeFlasher(fromChooser = false)
                 override fun openStore() = this@MainActivity.openStore()
+                override fun openMenu() = this@MainActivity.showChoice()
             },
         )
         service.listener = bridge
@@ -303,7 +377,11 @@ class MainActivity : AppCompatActivity() {
                 when (stage) {
                     // Back during the splash simply skips it.
                     Stage.SPLASH -> afterSplash()
-                    Stage.FLASHER -> closeNativeFlasher()
+                    // The flasher refuses to vanish mid-write; it asks first.
+                    Stage.FLASHER -> {
+                        val flasher = nativeFlasher
+                        if (flasher != null) flasher.leave { closeNativeFlasher() } else closeNativeFlasher()
+                    }
                     Stage.APP ->
                         if (webView.canGoBack()) {
                             webView.goBack()
@@ -311,6 +389,13 @@ class MainActivity : AppCompatActivity() {
                             isEnabled = false
                             onBackPressedDispatcher.onBackPressed()
                         }
+                    // Settings is a plain sub-screen of the menu.
+                    Stage.SETTINGS -> showChoice()
+                    // A running transfer asks before it is abandoned.
+                    Stage.WIFI -> {
+                        val wifi = wifiScreen
+                        if (wifi != null) wifi.leave { showChoice() } else showChoice()
+                    }
                     Stage.CHOICE -> {
                         isEnabled = false
                         onBackPressedDispatcher.onBackPressed()
@@ -381,7 +466,7 @@ class MainActivity : AppCompatActivity() {
                         if (url != null && !isLocalUrl(url)) injectSerialBridge()
                         deliverUsbAttach()
                     }
-                    Stage.SPLASH, Stage.CHOICE, Stage.FLASHER -> Unit
+                    Stage.SPLASH, Stage.CHOICE, Stage.SETTINGS, Stage.FLASHER, Stage.WIFI -> Unit
                 }
             }
 
@@ -482,6 +567,8 @@ class MainActivity : AppCompatActivity() {
         val view = layoutInflater.inflate(R.layout.view_splash, bootHost, false)
         setBootScreen(view)
         setVersion(view)
+        view.findViewById<ImageView>(R.id.splashLogo)?.setImageResource(palette.logo)
+        AttakyTheme.apply(view, palette, settings.textScale)
 
         val lockup = view.findViewById<View>(R.id.splashLockup)
         lockup.alpha = 0f
@@ -535,7 +622,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val overlay = ImageView(this).apply {
-                setImageResource(R.drawable.attaky_logo)
+                setImageResource(palette.logo)
                 scaleType = ImageView.ScaleType.FIT_CENTER
             }
             bootHost.addView(
@@ -602,13 +689,158 @@ class MainActivity : AppCompatActivity() {
     /** Every launch asks; the answer is a session choice, never stored. */
     private fun showChoice() {
         stage = Stage.CHOICE
+        settingsScreen = null
+        wifiScreen?.stop()
+        wifiScreen = null
         setBootScreen(buildChoiceScreen())
+    }
+
+    /**
+     * Look for a deck while the menu is up, and show the Launcher Web UI tile
+     * only if one answers: a tile that can only say "no deck" is worse than no
+     * tile. The sweep also stops at the first host that answers, so the tile
+     * appears a moment after the screen does.
+     */
+    private fun watchForDeck(tile: View, caption: TextView) {
+        stopDeckWatch()
+        val (user, password) = WifiDeckScreen.savedLogin(this)
+        val client = DeckWifi()
+        menuWifi = client
+        watching = true
+
+        val reveal = { host: String ->
+            // The screen may have moved on while the probe was running.
+            if (stage == Stage.CHOICE && tile.parent != null) {
+                caption.text = getString(R.string.choice_wifi_found, host)
+                tile.visibility = View.VISIBLE
+            }
+            // Found it: the tile stays, and there is nothing left to poll for.
+            stopDeckWatch()
+        }
+
+        // Look, and keep looking: the deck may still be booting, may come back
+        // from an OTA restart, or may join the network late. The next look is
+        // scheduled only once this one has finished, so a slow sweep never piles
+        // up another one on top of it.
+        val check = object : Runnable {
+            override fun run() {
+                if (!watching || stage != Stage.CHOICE || tile.parent == null) {
+                    stopDeckWatch()
+                    return
+                }
+                val self = this
+                val again: (DeckProtocol.Deck?) -> Unit = {
+                    if (watching) watchHandler.postDelayed(self, WATCH_INTERVAL_MS)
+                }
+                lookForDeck(client, user, password, reveal, again)
+            }
+        }
+        check.run()
+    }
+
+    /**
+     * One look: the deck this phone talked to last answers in about a second, so
+     * that probe runs on every tick, while the /24 sweep covers the case where
+     * the deck is on a new address. Both are paced by the same 7 s tick, and the
+     * sweep stops at the first host that answers, so a look costs one probe on a
+     * network the deck is already known on.
+     */
+    private fun lookForDeck(
+        client: DeckWifi,
+        user: String,
+        password: String,
+        reveal: (String) -> Unit,
+        again: (DeckProtocol.Deck?) -> Unit,
+    ) {
+        val sweep = {
+            if (System.currentTimeMillis() - lastSweepAt >= SWEEP_INTERVAL_MS) {
+                lastSweepAt = System.currentTimeMillis()
+                client.startScan(user, password, { _, _ -> }, reveal, again)
+            } else {
+                again(null)
+            }
+        }
+
+        val saved = getSharedPreferences(WifiDeckScreen.PREFS, Context.MODE_PRIVATE)
+            .getString(WifiDeckScreen.KEY_HOST, null)
+        if (saved.isNullOrEmpty()) {
+            sweep()
+        } else {
+            client.probeAddress(saved, user, password) { deck ->
+                if (deck != null) reveal(deck.host) else sweep()
+            }
+        }
+    }
+
+    /** Stop looking for the deck and drop the sweep behind it. */
+    private fun stopDeckWatch() {
+        watching = false
+        lastSweepAt = 0L
+        watchHandler.removeCallbacksAndMessages(null)
+        menuWifi?.stop()
+        menuWifi = null
+    }
+
+    /**
+     * Firmware onto the deck's SD card over the network: the deck runs its own
+     * web server, so this screen only needs WiFi on both ends.
+     */
+    private fun showWifi() {
+        if (stage == Stage.WIFI) return
+        stopDeckWatch()
+        closeSerialMonitor()
+        stage = Stage.WIFI
+
+        val view = layoutInflater.inflate(R.layout.view_wifi, bootHost, false)
+        setBootScreen(view)
+        wifiScreen = WifiDeckScreen(
+            activity = this,
+            settings = settings,
+            downloads = downloads,
+            root = view,
+            onBack = { showChoice() },
+            // The deck rebooted into the slot it was handed and dropped the
+            // session. Back to the menu, where the Launcher tile starts hidden
+            // again and the 7 s watch waits for the deck to come back.
+            onOtaDone = { if (stage == Stage.WIFI) showChoice() },
+        ).also { it.start() }
+        AttakyTheme.apply(view, palette, settings.textScale)
+    }
+
+    /**
+     * Appearance settings. The serial console hands the port back first, and
+     * leaving rebuilds the menu in whatever look was chosen.
+     */
+    private fun showSettings() {
+        stopDeckWatch()
+        closeSerialMonitor()
+        stage = Stage.SETTINGS
+        val view = layoutInflater.inflate(R.layout.view_settings, bootHost, false)
+        setBootScreen(view)
+        // The screen tags its own controls (the chosen theme wears the primary
+        // treatment), so it has to run before the first paint.
+        settingsScreen = SettingsScreen(
+            activity = this,
+            settings = settings,
+            root = view,
+            onBack = { showChoice() },
+            onChanged = { applyAppearance() },
+        ).also { it.start() }
+        AttakyTheme.apply(view, palette, settings.textScale)
+    }
+
+    /** Repaint the live screen and the window after a setting changed. */
+    private fun applyAppearance() {
+        val palette = palette
+        AttakyTheme.applyWindow(this, palette, settings)
+        AttakyTheme.apply(bootHost.getChildAt(0), palette, settings.textScale)
     }
 
     /** Inflate the main page and wire its tiles and its serial console. */
     private fun buildChoiceScreen(): View {
         val view = layoutInflater.inflate(R.layout.view_choice, bootHost, false)
         setVersion(view)
+        view.findViewById<ImageView>(R.id.choiceLogo)?.setImageResource(palette.logo)
 
         view.findViewById<View>(R.id.tileStore).setOnClickListener {
             startApp(storeUrl())
@@ -616,11 +848,21 @@ class MainActivity : AppCompatActivity() {
         view.findViewById<View>(R.id.tileBundled).setOnClickListener {
             openNativeFlasher(fromChooser = true)
         }
+        // The Launcher Web UI tile is offered only when a deck is answering on
+        // the network; watchForDeck reveals it the moment one is seen.
+        val tileWifi = view.findViewById<View>(R.id.tileWifi)
+        val wifiCaption = view.findViewById<TextView>(R.id.tileWifiSub)
+        tileWifi.visibility = View.GONE
+        tileWifi.setOnClickListener { showWifi() }
+        watchForDeck(tileWifi, wifiCaption)
+        view.findViewById<View>(R.id.btnSettings).setOnClickListener { showSettings() }
 
         val monitor = SerialMonitor(this, service, view)
         serialMonitor = monitor
         service.monitorListener = monitor
         monitor.start()
+
+        AttakyTheme.apply(view, palette, settings.textScale)
         return view
     }
 
@@ -632,6 +874,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startApp(url: String) {
+        stopDeckWatch()
         closeSerialMonitor()
         stage = Stage.APP
         storeFallbackDone = false
@@ -662,9 +905,10 @@ class MainActivity : AppCompatActivity() {
      */
     private fun openNativeFlasher(fromChooser: Boolean) {
         if (stage == Stage.FLASHER) return
+        stopDeckWatch()
 
         if (fromChooser && downloads.entries().isEmpty()) {
-            AlertDialog.Builder(this)
+            AttakyTheme.dialog(this, palette)
                 .setTitle(R.string.no_firmware_title)
                 .setMessage(R.string.no_firmware_message)
                 .setNegativeButton(R.string.no_firmware_choose) { _, _ ->
@@ -684,15 +928,23 @@ class MainActivity : AppCompatActivity() {
         val view = layoutInflater.inflate(R.layout.view_flasher, bootHost, false)
         bootHost.removeAllViews()
         bootHost.addView(view)
+        // Paint before the first frame; the flasher repaints as its rows change.
+        AttakyTheme.apply(view, palette, settings.textScale)
 
         val controller = NativeFlasher(
             activity = this,
             service = service,
             downloads = downloads,
             prefs = prefs,
+            settings = settings,
             root = view,
-            onExit = { closeNativeFlasher() },
-            onOpenStore = { openStore() },
+            // The corner button is the menu, not the store. It lands on the boot
+            // chooser every time, even when this screen was opened from a store
+            // page — the store is a tile there, so nothing is lost.
+            onMenu = {
+                flasherReturnStage = Stage.CHOICE
+                closeNativeFlasher()
+            },
         )
         nativeFlasher = controller
         controller.start()
@@ -766,7 +1018,7 @@ class MainActivity : AppCompatActivity() {
         // A hosted copy of the flasher page already ships webserial.js; running it
         // twice would drop the handlers app.js wrapped on window.__attaky.
         webView.evaluateJavascript(
-            "if (!window.attakySerial) {\n$polyfill\n}\n$STORE_ESCAPE_JS\n${storeMerge()}",
+            "if (!window.attakySerial) {\n$polyfill\n}\n${storeEscapeJs(palette)}\n${storeMerge()}",
             null,
         )
     }
@@ -888,6 +1140,9 @@ class MainActivity : AppCompatActivity() {
         closeSerialMonitor()
         nativeFlasher?.stop()
         nativeFlasher = null
+        wifiScreen?.stop()
+        wifiScreen = null
+        stopDeckWatch()
         service.stop()
         webView.removeJavascriptInterface("AttakyUSB")
         webView.destroy()
