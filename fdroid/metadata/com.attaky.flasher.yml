@@ -20,11 +20,19 @@ Builds:
       - yes
     scanignore:
       - app/src/main/assets/www/firmware
+  - versionName: 0.1.5-A007
+    versionCode: 18
+    commit: 3669c468f1415ef5aa074149694b2b9938452572
+    subdir: app
+    gradle:
+      - yes
+    scanignore:
+      - app/src/main/assets/www/firmware
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.1.0-A001
-CurrentVersionCode: 1
+CurrentVersion: 0.1.5-A007
+CurrentVersionCode: 18
 
 MaintainerNotes: |-
   This repository is a copy of the recipe that lives in fdroiddata
@@ -45,6 +53,9 @@ MaintainerNotes: |-
   * com.github.mik3y:usb-serial-for-android (MIT) is published on JitPack
     only, so the build needs network access to jitpack.io. JitPack can
     occasionally be slow, so a retry may be needed.
+  * The build needs compileSdk 37 with AGP 9.5.0 and Gradle 9.8.2, on a Java
+    21 daemon (JetBrains Runtime; pinned in gradle/gradle-daemon-jvm.properties).
+    The Gradle wrapper is committed, so no separate Gradle install is needed.
   * The default home screen is the live proprietary store at
     fwstore.attaky.com. The app also works fully offline from its native
     flasher, but reviewers may still wish to apply the NonFreeNet

@@ -17,8 +17,8 @@ has three front ends and two tools:
   app slot over OTA — with no cable and no card reader.
 - **ESP serial:** a console for any USB serial board, printing the raw bytes of
   everything in and out.
-- **Settings:** light/dark, full screen, text size and the text colours, applied
-  to every native screen.
+- **Settings:** light/dark, full screen, text size and the text colours —
+  including a neon category for the dark page — applied to every native screen.
 
 Labels say **core**, not deck. The shared-preference keys kept their original
 names (`deck_host`, `deck_user`, `deck_pass`) so a saved core login survives.
@@ -63,7 +63,11 @@ with the system-bar and display-cutout insets itself.
 ## Use
 
 1. Open **Attaky Flasher**. The splash shows the wordmark and the version, then
-   the chooser, with **SETTINGS** in its top-right corner.
+   the chooser, with **SETTINGS** in its top-right corner. Every native screen
+   puts its corner button in that same box at the same 20dp/10dp corner —
+   **SETTINGS** on the chooser, **MENU** on the flasher, on Settings and on the
+   Launcher Web UI — so moving between screens does not move the button. There
+   are no back arrows: **MENU**, and system back, both return to the chooser.
 2. **FIRMWARE STORE** — pick a firmware and tap **Flash Online**. The app shows
    the Android USB permission dialog and the store drives the whole
    download + flash.
@@ -137,9 +141,10 @@ with the system-bar and display-cutout insets itself.
      partitions are left out of the update, so the core keeps its settings and
      installed apps; an image with no app part is refused before anything is
      written.
-   - Leaving mid-transfer asks first. An aborted upload is discarded by the core,
-     which deletes a body it did not receive in full, so no half file is left on
-     the card.
+   - Leaving mid-transfer asks first — **MENU** and system back both offer *Keep
+     sending* or *Leave anyway*. An aborted upload is discarded by the core, which
+     deletes a body it did not receive in full, so no half file is left on the
+     card.
 
    The wire format — login cookie, `/systeminfo`, multipart framing, `/OTA` — is
    in `DeckProtocol` and `DeckWifi`, which have no Android in them;
@@ -157,7 +162,8 @@ with the system-bar and display-cutout insets itself.
 ## Settings
 
 **SETTINGS**, top right of the chooser, changes the app's appearance only (the
-store pages keep their own colours):
+store pages keep their own colours). Its own screen carries **MENU** in that same
+corner, which returns to the chooser:
 
 - **Theme** — light or dark. Dark repaints the page, the cards, the dialogs
   (each one an outlined card in the dark palette, not a flat black panel), the
@@ -171,6 +177,12 @@ store pages keep their own colours):
   every primary button (CONNECT, FLASH, OTA, SEND), the progress bars, the
   checkbox tick and the ring around the selected swatch, with the label flipping
   to near-black when the tone is pale.
+- **Neon** — eight sign-light tones (green, cyan, blue, violet, magenta, red,
+  orange, yellow). These are the same primary slot, not a separate setting:
+  picking one repaints the headings, the values and the action buttons in it.
+  They are made for the dark page, and are offered in both themes rather than
+  hidden on the light one, so a neon pick made in the dark stays visible and
+  undoable after switching back.
 - **Reset** puts everything back to the designed light look.
 
 The palettes live in `colors.xml` (plus `values-night/`) and are applied by
@@ -257,7 +269,7 @@ The license is kept at `app/src/main/assets/www/vendor/esptool-js.LICENSE.txt`.
 | `app/src/main/java/com/attaky/flasher/DeckWifi.kt` | Launcher HTTP: subnet sweep, `/systeminfo`, multipart upload, OTA |
 | `app/src/main/java/com/attaky/flasher/DeckProtocol.kt` | Pure-Kotlin launcher wire format: login, system info, upload framing |
 | `app/src/main/java/com/attaky/flasher/OtaManifest.kt` | Reads a merged image's partition table and builds the `/OTA` manifest |
-| `app/src/main/java/com/attaky/flasher/SettingsScreen.kt` | Settings behaviour: theme, full screen, text size, text colours |
+| `app/src/main/java/com/attaky/flasher/SettingsScreen.kt` | Settings behaviour: theme, full screen, text size, text colours and the neon swatches |
 | `app/src/main/java/com/attaky/flasher/AttakyTheme.kt` | Palette resolution and the view-tree repaint every native screen uses |
 | `app/src/main/java/com/attaky/flasher/AppSettings.kt` | The stored appearance choices |
 | `app/src/main/java/com/attaky/flasher/EspFlasher.kt` | Earlier hand-rolled ROM protocol, no longer used (superseded by `JsFlasher`) |
@@ -306,8 +318,11 @@ Everything F-Droid needs is in this repository:
 
 - [`fdroid/metadata/com.attaky.flasher.yml`](fdroid/metadata/com.attaky.flasher.yml)
   is the `fdroiddata` build recipe (single-module Gradle build: `subdir: app`,
-  `gradle: [yes]`). It still points at the first release; move `versionName`,
-  `versionCode` and `commit` forward when a tag is cut.
+  `gradle: [yes]`). It pins **0.1.5-A007** / `versionCode: 18` to commit
+  `3669c46`, with the first release kept below it; when a tag is cut, append a
+  `Builds` entry for it, then move `CurrentVersion` and `CurrentVersionCode`
+  forward. `UpdateCheckMode: Tags` reads the version from every tag, so the tag
+  name itself does not have to carry it.
 - [`fastlane/metadata/android/en-US/`](fastlane/metadata/android/en-US/) holds the
   title, short/full description, changelogs (one file per `versionCode`), icon,
   feature graphic and phone screenshots.
@@ -315,7 +330,7 @@ Everything F-Droid needs is in this repository:
 To submit:
 
 1. Push this repository to a public git host and add a tag for the release
-   (e.g. `v0.1.0-A001`).
+   (e.g. `v0.1.5-A007`).
 2. Copy `fdroid/metadata/com.attaky.flasher.yml` to
    `metadata/com.attaky.flasher.yml` in a fork of
    [fdroiddata](https://gitlab.com/fdroid/fdroiddata), set `Repo`/`SourceCode`
