@@ -799,8 +799,8 @@ class MainActivity : AppCompatActivity() {
             settings = settings,
             downloads = downloads,
             root = view,
-            onBack = { showChoice() },
-            // The deck rebooted into the slot it was handed and dropped the
+            onMenu = { showChoice() },
+            // The core rebooted into the slot it was handed and dropped the
             // session. Back to the menu, where the Launcher tile starts hidden
             // again and the 7 s watch waits for the deck to come back.
             onOtaDone = { if (stage == Stage.WIFI) showChoice() },
@@ -824,7 +824,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             settings = settings,
             root = view,
-            onBack = { showChoice() },
+            onMenu = { showChoice() },
             onChanged = { applyAppearance() },
         ).also { it.start() }
         AttakyTheme.apply(view, palette, settings.textScale)

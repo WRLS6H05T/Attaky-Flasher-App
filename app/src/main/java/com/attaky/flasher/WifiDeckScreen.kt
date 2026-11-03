@@ -35,7 +35,7 @@ class WifiDeckScreen(
     private val settings: AppSettings,
     private val downloads: FirmwareDownloads,
     private val root: View,
-    private val onBack: () -> Unit,
+    private val onMenu: () -> Unit,
     /**
      * An OTA install rebooted the deck, so the session is gone. The menu is the
      * only sensible place to be: there is nothing left to send and the deck will
@@ -82,7 +82,7 @@ class WifiDeckScreen(
 
     /** Where the screen is: the deck's login and the list, ready to use. */
     fun start() {
-        root.findViewById<View>(R.id.wifiBack).setOnClickListener { leave(onBack) }
+        root.findViewById<View>(R.id.btnMenu).setOnClickListener { leave(onMenu) }
         scanButton.setOnClickListener { if (!scanning && sending == null) scan() }
 
         userInput.setText(prefs.getString(KEY_USER, DEFAULT_USER))

@@ -17,14 +17,15 @@ import kotlin.math.roundToInt
  * The settings screen's behaviour.
  *
  * Four appearance choices: light or dark, full screen, text size and the two
- * text tones. Each one is written to [AppSettings] the moment it changes and the
- * host repaints the screen, so the result is visible without leaving Settings.
+ * text tones, plus the neon category of tones aimed at the dark page. Each one is
+ * written to [AppSettings] the moment it changes and the host repaints the
+ * screen, so the result is visible without leaving Settings.
  */
 class SettingsScreen(
     private val activity: Activity,
     private val settings: AppSettings,
     private val root: View,
-    private val onBack: () -> Unit,
+    private val onMenu: () -> Unit,
     private val onChanged: () -> Unit,
 ) {
 
@@ -37,6 +38,7 @@ class SettingsScreen(
     private val scaleValue: TextView = root.findViewById(R.id.textScaleValue)
     private val inkSwatches: LinearLayout = root.findViewById(R.id.inkSwatches)
     private val mutedSwatches: LinearLayout = root.findViewById(R.id.mutedSwatches)
+    private val neonSwatches: LinearLayout = root.findViewById(R.id.neonSwatches)
 
     private val options = listOf(
         Swatch(AppSettings.AUTO, R.string.settings_color_auto),
@@ -49,8 +51,20 @@ class SettingsScreen(
         Swatch(color(R.color.swatch_violet), R.string.settings_color_violet),
     )
 
+    /** The neon category: the same pick, in the tones made for the dark page. */
+    private val neonOptions = listOf(
+        Swatch(color(R.color.swatch_neon_green), R.string.settings_color_neon_green),
+        Swatch(color(R.color.swatch_neon_cyan), R.string.settings_color_neon_cyan),
+        Swatch(color(R.color.swatch_neon_blue), R.string.settings_color_neon_blue),
+        Swatch(color(R.color.swatch_neon_violet), R.string.settings_color_neon_violet),
+        Swatch(color(R.color.swatch_neon_magenta), R.string.settings_color_neon_magenta),
+        Swatch(color(R.color.swatch_neon_red), R.string.settings_color_neon_red),
+        Swatch(color(R.color.swatch_neon_orange), R.string.settings_color_neon_orange),
+        Swatch(color(R.color.swatch_neon_yellow), R.string.settings_color_neon_yellow),
+    )
+
     fun start() {
-        root.findViewById<View>(R.id.settingsBack).setOnClickListener { onBack() }
+        root.findViewById<View>(R.id.btnMenu).setOnClickListener { onMenu() }
 
         themeLight.setOnClickListener { setDark(false) }
         themeDark.setOnClickListener { setDark(true) }
@@ -102,20 +116,26 @@ class SettingsScreen(
         if (scaleBar.progress != progress) scaleBar.progress = progress
         scaleValue.text = percent()
 
-        fill(inkSwatches, settings.inkColor) { picked ->
+        fill(inkSwatches, options, settings.inkColor) { picked ->
             settings.inkColor = picked
             render()
             onChanged()
         }
-        fill(mutedSwatches, settings.mutedColor) { picked ->
+        fill(mutedSwatches, options, settings.mutedColor) { picked ->
             settings.mutedColor = picked
+            render()
+            onChanged()
+        }
+        // The neon pick is the primary tone too: same slot, brighter palette.
+        fill(neonSwatches, neonOptions, settings.inkColor) { picked ->
+            settings.inkColor = picked
             render()
             onChanged()
         }
     }
 
     /** Four swatches to a line, so the row fits a phone without scrolling. */
-    private fun fill(row: LinearLayout, current: Int, onPick: (Int) -> Unit) {
+    private fun fill(row: LinearLayout, options: List<Swatch>, current: Int, onPick: (Int) -> Unit) {
         row.removeAllViews()
         var line: LinearLayout? = null
         options.forEachIndexed { index, option ->

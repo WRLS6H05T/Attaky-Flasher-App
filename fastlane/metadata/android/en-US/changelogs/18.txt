@@ -1,0 +1,2 @@
+* Neon text colours: eight sign-light tones for the dark page, in their own category in Settings.
+* Settings and the Launcher Web UI now carry the same MENU button in the top-right corner as the menu and the flasher, instead of a back arrow.

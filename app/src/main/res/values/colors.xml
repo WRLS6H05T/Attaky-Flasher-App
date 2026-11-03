@@ -59,4 +59,19 @@
     <color name="swatch_green">#FF2F9E58</color>
     <color name="swatch_blue">#FF2D6CDF</color>
     <color name="swatch_violet">#FF8B5CF6</color>
+
+    <!--
+      The neon category: saturated sign colours, picked to sit on the dark page
+      (they are offered in the light one too, where they are loud rather than
+      unreadable). They are ordinary text tones — the headings, the values and,
+      with them, the action buttons.
+    -->
+    <color name="swatch_neon_green">#FF39FF14</color>
+    <color name="swatch_neon_cyan">#FF00E5FF</color>
+    <color name="swatch_neon_blue">#FF3D5AFE</color>
+    <color name="swatch_neon_violet">#FFB14AFF</color>
+    <color name="swatch_neon_magenta">#FFFF2BD6</color>
+    <color name="swatch_neon_red">#FFFF2D55</color>
+    <color name="swatch_neon_orange">#FFFF8A00</color>
+    <color name="swatch_neon_yellow">#FFFFEA00</color>
 </resources>

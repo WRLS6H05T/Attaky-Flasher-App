@@ -98,7 +98,6 @@
     <!-- Settings: reached from the main page, changes only the native screens. -->
     <string name="settings_title" translatable="false">SETTINGS</string>
     <string name="settings_open">Settings</string>
-    <string name="settings_back">Back</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_sub">Dark switches the page, the cards and the logo to the dark artwork.</string>
     <string name="settings_light">LIGHT</string>
@@ -121,5 +120,17 @@
     <string name="settings_color_green">Green</string>
     <string name="settings_color_blue">Blue</string>
     <string name="settings_color_violet">Violet</string>
+
+    <!-- Neon text tones: the category aimed at the dark page. -->
+    <string name="settings_neon">Neon</string>
+    <string name="settings_neon_sub">Sign-light tones for the dark page. Picking one sets the headings and values, and the action buttons follow it like any other tone.</string>
+    <string name="settings_color_neon_green">Neon green</string>
+    <string name="settings_color_neon_cyan">Neon cyan</string>
+    <string name="settings_color_neon_blue">Neon blue</string>
+    <string name="settings_color_neon_violet">Neon violet</string>
+    <string name="settings_color_neon_magenta">Neon magenta</string>
+    <string name="settings_color_neon_red">Neon red</string>
+    <string name="settings_color_neon_orange">Neon orange</string>
+    <string name="settings_color_neon_yellow">Neon yellow</string>
     <string name="settings_reset">RESET TO DEFAULTS</string>
 </resources>

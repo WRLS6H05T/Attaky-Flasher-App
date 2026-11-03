@@ -1,239 +1,276 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Settings, reached from the main page. Appearance only: the theme, the
-  full-screen mode, the text size and the two text tones. Everything here is
+  full-screen mode, the text size and the text tones. Everything here is
   native — the store pages keep their own colours.
 
   The `android:tag="attaky:..."` values are not styling: they tell AttakyTheme
   what each part is, so one walk can repaint the screen in either palette and in
   the user's chosen text colours.
+
+  The header is the menu's own corner button: the same MENU the flasher and the
+  store pages carry, in the same box at the same 20dp/10dp corner, so nothing
+  moves when this screen opens over the menu or closes again. There is no back
+  arrow any more.
 -->
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/settingsRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:tag="attaky:bg"
-    android:fillViewport="true"
-    android:scrollbars="none">
+    android:orientation="vertical"
+    android:tag="attaky:bg">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingStart="16dp"
-        android:paddingTop="12dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="24dp">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/jetbrains_mono_semibold"
+            android:letterSpacing="0.16"
+            android:tag="attaky:ink"
+            android:text="@string/settings_title"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btnMenu"
+            style="@style/AttakyButton"
+            android:gravity="center"
+            android:minWidth="112dp"
+            android:tag="attaky:outline"
+            android:text="@string/menu_title" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/settingsScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="24dp">
 
-            <TextView
-                android:id="@+id/settingsBack"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:contentDescription="@string/settings_back"
-                android:focusable="true"
-                android:fontFamily="@font/switzer_medium"
-                android:paddingStart="6dp"
-                android:paddingTop="6dp"
-                android:paddingEnd="12dp"
-                android:paddingBottom="6dp"
-                android:tag="attaky:ink"
-                android:text="←"
-                android:textSize="22sp" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:fontFamily="@font/jetbrains_mono_semibold"
-                android:letterSpacing="0.16"
-                android:tag="attaky:ink"
-                android:text="@string/settings_title"
-                android:textSize="13sp" />
-        </LinearLayout>
-
-        <!-- Theme -->
-        <LinearLayout
-            style="@style/AttakyCard"
-            android:layout_marginTop="14dp"
-            android:tag="attaky:card">
-
-            <TextView
-                style="@style/AttakySectionLabel"
-                android:layout_width="match_parent"
-                android:tag="attaky:muted"
-                android:text="@string/settings_theme" />
-
-            <TextView
-                style="@style/AttakyBody"
-                android:layout_marginTop="6dp"
-                android:tag="attaky:muted"
-                android:text="@string/settings_theme_sub" />
-
+            <!-- Theme -->
             <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/themeLight"
-                    style="@style/AttakyButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:tag="attaky:outline"
-                    android:text="@string/settings_light" />
-
-                <Button
-                    android:id="@+id/themeDark"
-                    style="@style/AttakyButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:tag="attaky:outline"
-                    android:text="@string/settings_dark" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- Full screen -->
-        <LinearLayout
-            style="@style/AttakyCard"
-            android:tag="attaky:card">
-
-            <TextView
-                style="@style/AttakySectionLabel"
-                android:layout_width="match_parent"
-                android:tag="attaky:muted"
-                android:text="@string/settings_fullscreen" />
-
-            <TextView
-                style="@style/AttakyBody"
-                android:layout_marginTop="6dp"
-                android:tag="attaky:muted"
-                android:text="@string/settings_fullscreen_sub" />
-
-            <CheckBox
-                android:id="@+id/fullScreenToggle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                style="@style/AttakyCard"
                 android:layout_marginTop="10dp"
-                android:fontFamily="@font/switzer_regular"
-                android:tag="attaky:check"
-                android:text="@string/settings_fullscreen_toggle"
-                android:textSize="13sp" />
-        </LinearLayout>
-
-        <!-- Text size -->
-        <LinearLayout
-            style="@style/AttakyCard"
-            android:tag="attaky:card">
-
-            <TextView
-                style="@style/AttakySectionLabel"
-                android:layout_width="match_parent"
-                android:tag="attaky:muted"
-                android:text="@string/settings_text_size" />
-
-            <TextView
-                style="@style/AttakyBody"
-                android:layout_marginTop="6dp"
-                android:tag="attaky:muted"
-                android:text="@string/settings_text_size_sub" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:tag="attaky:card">
 
                 <TextView
-                    android:id="@+id/textScaleValue"
-                    android:layout_width="56dp"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="@font/jetbrains_mono_regular"
-                    android:tag="attaky:ink"
-                    android:textSize="12sp" />
+                    style="@style/AttakySectionLabel"
+                    android:layout_width="match_parent"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_theme" />
 
-                <SeekBar
-                    android:id="@+id/textScaleBar"
-                    android:layout_width="0dp"
+                <TextView
+                    style="@style/AttakyBody"
+                    android:layout_marginTop="6dp"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_theme_sub" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:max="100"
-                    android:tag="attaky:progress" />
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/themeLight"
+                        style="@style/AttakyButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:tag="attaky:outline"
+                        android:text="@string/settings_light" />
+
+                    <Button
+                        android:id="@+id/themeDark"
+                        style="@style/AttakyButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:tag="attaky:outline"
+                        android:text="@string/settings_dark" />
+                </LinearLayout>
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/textScalePreview"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:fontFamily="@font/switzer_regular"
-                android:lineSpacingExtra="2dp"
-                android:tag="attaky:ink"
-                android:text="@string/settings_text_preview"
-                android:textSize="14sp" />
-        </LinearLayout>
-
-        <!-- Text colours: the swatch rows are filled in by SettingsScreen. -->
-        <LinearLayout
-            style="@style/AttakyCard"
-            android:tag="attaky:card">
-
-            <TextView
-                style="@style/AttakySectionLabel"
-                android:layout_width="match_parent"
-                android:tag="attaky:muted"
-                android:text="@string/settings_text_color" />
-
-            <TextView
-                style="@style/AttakyBody"
-                android:layout_marginTop="6dp"
-                android:tag="attaky:muted"
-                android:text="@string/settings_text_color_sub" />
-
-            <TextView
-                style="@style/AttakyBody"
-                android:layout_marginTop="14dp"
-                android:tag="attaky:muted"
-                android:text="@string/settings_text_primary" />
-
+            <!-- Full screen -->
             <LinearLayout
-                android:id="@+id/inkSwatches"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:orientation="vertical" />
+                style="@style/AttakyCard"
+                android:tag="attaky:card">
 
-            <TextView
-                style="@style/AttakyBody"
-                android:layout_marginTop="12dp"
-                android:tag="attaky:muted"
-                android:text="@string/settings_text_secondary" />
+                <TextView
+                    style="@style/AttakySectionLabel"
+                    android:layout_width="match_parent"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_fullscreen" />
 
+                <TextView
+                    style="@style/AttakyBody"
+                    android:layout_marginTop="6dp"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_fullscreen_sub" />
+
+                <CheckBox
+                    android:id="@+id/fullScreenToggle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:fontFamily="@font/switzer_regular"
+                    android:tag="attaky:check"
+                    android:text="@string/settings_fullscreen_toggle"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- Text size -->
             <LinearLayout
-                android:id="@+id/mutedSwatches"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:orientation="vertical" />
-        </LinearLayout>
+                style="@style/AttakyCard"
+                android:tag="attaky:card">
 
-        <Button
-            android:id="@+id/settingsReset"
-            style="@style/AttakyButton"
-            android:layout_marginTop="16dp"
-            android:tag="attaky:outline"
-            android:text="@string/settings_reset" />
-    </LinearLayout>
-</ScrollView>
+                <TextView
+                    style="@style/AttakySectionLabel"
+                    android:layout_width="match_parent"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_text_size" />
+
+                <TextView
+                    style="@style/AttakyBody"
+                    android:layout_marginTop="6dp"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_text_size_sub" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/textScaleValue"
+                        android:layout_width="56dp"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/jetbrains_mono_regular"
+                        android:tag="attaky:ink"
+                        android:textSize="12sp" />
+
+                    <SeekBar
+                        android:id="@+id/textScaleBar"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="100"
+                        android:tag="attaky:progress" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/textScalePreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="@font/switzer_regular"
+                    android:lineSpacingExtra="2dp"
+                    android:tag="attaky:ink"
+                    android:text="@string/settings_text_preview"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <!-- Text colours: the swatch rows are filled in by SettingsScreen. -->
+            <LinearLayout
+                style="@style/AttakyCard"
+                android:tag="attaky:card">
+
+                <TextView
+                    style="@style/AttakySectionLabel"
+                    android:layout_width="match_parent"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_text_color" />
+
+                <TextView
+                    style="@style/AttakyBody"
+                    android:layout_marginTop="6dp"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_text_color_sub" />
+
+                <TextView
+                    style="@style/AttakyBody"
+                    android:layout_marginTop="14dp"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_text_primary" />
+
+                <LinearLayout
+                    android:id="@+id/inkSwatches"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="vertical" />
+
+                <TextView
+                    style="@style/AttakyBody"
+                    android:layout_marginTop="12dp"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_text_secondary" />
+
+                <LinearLayout
+                    android:id="@+id/mutedSwatches"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <!--
+              Neon: the saturated tones that only really read on the dark page.
+              They are ordinary text colours — the pick sets the headings and
+              values, and the action buttons follow them like any other tone.
+            -->
+            <LinearLayout
+                style="@style/AttakyCard"
+                android:tag="attaky:card">
+
+                <TextView
+                    style="@style/AttakySectionLabel"
+                    android:layout_width="match_parent"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_neon" />
+
+                <TextView
+                    style="@style/AttakyBody"
+                    android:layout_marginTop="6dp"
+                    android:tag="attaky:muted"
+                    android:text="@string/settings_neon_sub" />
+
+                <LinearLayout
+                    android:id="@+id/neonSwatches"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/settingsReset"
+                style="@style/AttakyButton"
+                android:layout_marginTop="16dp"
+                android:tag="attaky:outline"
+                android:text="@string/settings_reset" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

@@ -12,9 +12,9 @@ android {
         applicationId = "com.attaky.flasher"
         minSdk = 24
         targetSdk = 37
-        versionCode = 17
+        versionCode = 18
         // Shown on the splash screen under the wordmark, e.g. "V0.1.0-A001".
-        versionName = "0.1.5-A006"
+        versionName = "0.1.5-A007"
         // SVG/vector + WebView assets only; no need to split ABI or language.
     }
 
