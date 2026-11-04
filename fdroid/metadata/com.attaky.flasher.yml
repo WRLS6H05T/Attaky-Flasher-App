@@ -50,12 +50,18 @@ MaintainerNotes: |-
   * app/src/main/assets/www/vendor/esptool-js.js is a vendored classic-script
     build of esptool-js (Apache-2.0). Tools to re-vendor it live in tools/;
     its licence is kept at vendor/esptool-js.LICENSE.txt.
-  * com.github.mik3y:usb-serial-for-android (MIT) is published on JitPack
-    only, so the build needs network access to jitpack.io. JitPack can
-    occasionally be slow, so a retry may be needed.
-  * The build needs compileSdk 37 with AGP 9.5.0 and Gradle 9.8.2, on a Java
-    21 daemon (JetBrains Runtime; pinned in gradle/gradle-daemon-jvm.properties).
-    The Gradle wrapper is committed, so no separate Gradle install is needed.
+  * com.github.mik3y:usb-serial-for-android 3.11.0 (MIT) is published on
+    JitPack only - Maven Central has no artifact at that coordinate - so the
+    build resolves it over the network from jitpack.io, at an exact version.
+    JitPack builds on demand and can be slow, so a retry may be needed. The
+    library is also wrapped as an fdroiddata srclib
+    (srclibs/UsbSerial4Android.yml) if building it from source is preferred.
+  * The build needs compileSdk 37 with AGP 9.5.0 and Gradle 9.8.2, on Java 21.
+    The daemon JVM criteria are pinned in gradle/gradle-daemon-jvm.properties
+    and ask for version 21 from any vendor, so Debian's default-jdk-headless
+    (21 on trixie) satisfies them even though the buildserver disables Java
+    auto-download. The Gradle wrapper is committed, so no separate Gradle
+    install is needed.
   * The default home screen is the live proprietary store at
     fwstore.attaky.com. The app also works fully offline from its native
     flasher, but reviewers may still wish to apply the NonFreeNet

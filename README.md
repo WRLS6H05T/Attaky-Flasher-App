@@ -326,6 +326,11 @@ Everything F-Droid needs is in this repository:
 - [`fastlane/metadata/android/en-US/`](fastlane/metadata/android/en-US/) holds the
   title, short/full description, changelogs (one file per `versionCode`), icon,
   feature graphic and phone screenshots.
+- The recipe builds the release variant (`assembleRelease`, unsigned). The one
+  dependency that is not on Maven Central is `usb-serial-for-android`, which is
+  published only on JitPack, so the build resolves it over the network at an
+  exact version — the same thing a local build does. Everything else is Google
+  Maven and Central. Java 21 is required, of any vendor.
 
 To submit:
 
