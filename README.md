@@ -319,7 +319,7 @@ Everything F-Droid needs is in this repository:
 - [`fdroid/metadata/com.attaky.flasher.yml`](fdroid/metadata/com.attaky.flasher.yml)
   is the `fdroiddata` build recipe (single-module Gradle build: `subdir: app`,
   `gradle: [yes]`). It pins **0.1.5-A007** / `versionCode: 18` to commit
-  `3669c46`, with the first release kept below it; when a tag is cut, append a
+  `aa9b71d`, with the first release kept below it; when a tag is cut, append a
   `Builds` entry for it, then move `CurrentVersion` and `CurrentVersionCode`
   forward. `UpdateCheckMode: Tags` reads the version from every tag, so the tag
   name itself does not have to carry it.

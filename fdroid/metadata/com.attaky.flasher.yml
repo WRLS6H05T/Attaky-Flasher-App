@@ -22,7 +22,7 @@ Builds:
       - app/src/main/assets/www/firmware
   - versionName: 0.1.5-A007
     versionCode: 18
-    commit: 3669c468f1415ef5aa074149694b2b9938452572
+    commit: aa9b71d398993cbe51930843e7d647d601c0f6c6
     subdir: app
     gradle:
       - yes
